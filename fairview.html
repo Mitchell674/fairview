@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Fairview - Честный взгляд на цены</title>
+    <!-- Шрифт Inter из безопасного источника -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+            color: #1D1D1D;
+            line-height: 1.4;
+        }
+
+        /* Цветовая схема */
+        :root {
+            --yellow: #FFC107;
+            --red: #E63946;
+            --black: #1D1D1D;
+            --white: #FFFFFF;
+            --gray-bg: #F5F5F5;
+            --gray-border: #E0E0E0;
+        }
+
+        /* Навигация между страницами */
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Шапка */
+        .header {
+            background: var(--black);
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            cursor: pointer;
+        }
+
+        .logo span:first-child {
+            color: var(--yellow);
+        }
+        .logo span:last-child {
+            color: var(--red);
+        }
+
+        .search-bar {
+            flex: 1;
+            max-width: 400px;
+            display: flex;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 30px 0 0 30px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .search-bar button {
+            background: var(--yellow);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 0 30px 30px 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--black);
+            transition: 0.2s;
+        }
+        .search-bar button:hover {
+            background: #e0a800;
+        }
+
+        .location-selector {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .location-selector:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Основной контейнер */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+
+        /* Кнопки */
+        .btn-yellow {
+            background: var(--yellow);
+            color: var(--black);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-yellow:hover {
+            background: #e0a800;
+            transform: scale(1.02);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--yellow);
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            color: var(--black);
+        }
+        .btn-outline:hover {
+            background: var(--yellow);
+        }
+        .btn-red {
+            background: var(--red);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-red:hover {
+            background: #c1122f;
+        }
+
+        /* Карточки товаров */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        }
+        .product-img {
+            height: 160px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+        }
+        .product-info {
+            padding: 16px;
+        }
+        .product-title {
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+        .product-price {
+            color: var(--red);
+            font-weight: 800;
+            font-size: 24px;
+            margin: 8px 0;
+        }
+        .product-meta {
+            font-size: 13px;
+            color: #666;
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .reactions {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+        }
+        .reactions button {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 30px;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .reactions button:hover {
+            background: #f0f0f0;
+        }
+
+        /* Карта (заглушка) */
+        .map-placeholder {
+            background: #e9ecef;
+            height: 400px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background-image: radial-gradient(circle, #bbb 1px, transparent 1px);
+            background-size: 20px 20px;
+            margin: 20px 0;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Две колонки */
+        .two-columns {
+            display: flex;
+            gap: 32px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .sidebar {
+            flex: 1;
+            min-width: 260px;
+        }
+        .main-content {
+            flex: 2;
+            min-width: 300px;
+        }
+
+        /* Список магазинов */
+        .shop-list {
+            background: white;
+            border-radius: 20px;
+            padding: 16px;
+        }
+        .shop-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--gray-border);
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .shop-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Форма создания карточки */
+        .form-card {
+            background: white;
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--gray-border);
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--yellow);
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 5px solid var(--yellow);
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        /* Хлебные крошки */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 24px;
+            color: var(--black);
+        }
+        .back-link:hover {
+            color: var(--red);
+        }
+
+        footer {
+            text-align: center;
+            padding: 32px;
+            color: #666;
+            border-top: 1px solid var(--gray-border);
+            margin-top: 48px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 16px;
+            }
+            .container {
+                padding: 16px;
+            }
+            .search-bar {
+                max-width: 100%;
+            }
+            .two-columns {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo" onclick="showPage('home')">
+        <span>Fair</span><span>view</span>
+    </div>
+    <div class="search-bar">
+        <input type="text" placeholder="Искать товар, бренд..." id="globalSearch">
+        <button onclick="alert('Поиск в разработке. Функция появится в следующей версии!')">🔍</button>
+    </div>
+    <div class="location-selector" onclick="alert('Выбор региона появится в ближайшее время')">
+        📍 Москва, Россия ▼
+    </div>
+</div>
+
+<!-- ================= СТРАНИЦА 1: ГЛАВНАЯ ================= -->
+<div id="page-home" class="page active">
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+            <h1 style="font-size: 28px;">🍎 Сравнивай цены честно</h1>
+            <button class="btn-yellow" id="createCardBtnHome">+ Создать карточку товара</button>
+        </div>
+
+        <!-- Блок карты -->
+        <div class="map-placeholder">
+            🗺️ <strong>Интерактивная карта магазинов</strong><br>
+            <small>📍 Здесь появятся магазины с актуальными ценами</small>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin: 32px 0 16px 0;">
+            <h2>⭐ Популярные товары</h2>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-outline" id="goToBudgetBtn" style="padding: 8px 16px;">📊 Планировать бюджет</button>
+                <button class="btn-outline" id="goToBestPriceBtn" style="padding: 8px 16px;">🏷️ Лучшая цена</button>
+            </div>
+        </div>
+        <div class="product-grid" id="popularProducts">
+            <!-- Карточки будут добавлены JS -->
+        </div>
+    </div>
+</div>
+
+<!-- ================= СТРАНИЦА 2: КАРТОЧКА ТОВАРА ================= -->
+<div id="page-product" class="page">
+    <div class="container">
+        <button class="back-link" onclick="showPage('home')">← Назад к списку</button>
+        <div id="productDetailContainer">
+            <!-- Динамическое содержимое карточки -->
+        </div>
+    </div>
+</div>
+
+<!-- ================= СТРАНИЦА 3: СОЗДАНИЕ КАРТОЧКИ ================= -->
+<div id="page-create" class="page">
+    <div class="container">
+        <button class="back-link" onclick="showPage('home')">← На главную</button>
+        <div class="form-card">
+            <h2 style="margin-bottom: 24px;">📸 Создать карточку товара</h2>
+            <div class="warning" id="duplicateWarning" style="display: none;">
+                ⚠️ Такой товар уже существует в этом магазине! Вы можете перейти к существующей карточке.
+            </div>
+            <form id="createProductForm">
+                <div class="form-group">
+                    <label>Фото ценника *</label>
+                    <input type="file" accept="image/*" id="productPhoto">
+                    <small style="color: #666;">Загрузите фото ценника или чека</small>
+                </div>
+                <div class="form-group">
+                    <label>Магазин *</label>
+                    <select id="shopSelect">
+                        <option value="Пятёрочка (Тверская ул., 15)">Пятёрочка (Тверская ул., 15)</option>
+                        <option value="Перекрёсток (Арбат, 10)">Перекрёсток (Арбат, 10)</option>
+                        <option value="Ашан (ТЦ Европа)">Ашан (ТЦ Европа)</option>
+                        <option value="Магнит (Ленина, 5)">Магнит (Ленина, 5)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Название товара *</label>
+                    <input type="text" id="productName" placeholder="Например: Молоко Домик в деревне">
+                </div>
+                <div class="form-group">
+                    <label>Цена (₽) *</label>
+                    <input type="number" id="productPrice" step="0.01" placeholder="99.90">
+                </div>
+                <div class="form-group">
+                    <label>Производитель / Бренд</label>
+                    <input type="text" id="productBrand" placeholder="PepsiCo, Danone...">
+                </div>
+                <div class="form-group">
+                    <label>Вес / Объём</label>
+                    <input type="text" id="productWeight" placeholder="1 л, 500 г, 200 мл...">
+                </div>
+                <button type="submit" class="btn-yellow" style="width: 100%;">📤 Опубликовать карточку</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ================= СТРАНИЦА 4: ПЛАНИРОВАНИЕ БЮДЖЕТА ================= -->
+<div id="page-budget" class="page">
+    <div class="container">
+        <button class="back-link" onclick="showPage('home')">← На главную</button>
+        <h2 style="margin-bottom: 16px;">✈️ Планирование бюджета в другой стране</h2>
+        <p style="color: #666; margin-bottom: 24px;">Добавьте товары в корзину на главной странице (кнопка "+ Бюджет")</p>
+        <div class="two-columns">
+            <div class="sidebar">
+                <div style="background: white; border-radius: 20px; padding: 20px;">
+                    <h3>🛒 Ваша корзина</h3>
+                    <div id="budgetCartList" style="margin-top: 16px; min-height: 150px;">
+                        <p style="color: #999;">Корзина пуста</p>
+                    </div>
+                    <button class="btn-yellow" id="simulateSearchOnMap" style="width: 100%; margin-top: 16px;">🔍 Искать на карте</button>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="map-placeholder" id="budgetMap" style="height: 280px;">
+                    🗺️ Карта: магазины с выбранными товарами<br>
+                    <span id="mapResultLabel" style="font-size: 13px;">Нажмите "Искать на карте"</span>
+                </div>
+                <div class="shop-list" id="mapShopResults" style="margin-top: 16px;">
+                    <p style="color: gray; text-align: center;">Результаты появятся после поиска</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= СТРАНИЦА 5: ЛУЧШАЯ ЦЕНА ================= -->
+<div id="page-bestprice" class="page">
+    <div class="container">
+        <button class="back-link" onclick="showPage('home')">← На главную</button>
+        <h2 style="margin-bottom: 16px;">🏆 Поиск лучшей цены</h2>
+        <p style="color: #666; margin-bottom: 24px;">Добавьте товары через кнопку "+ Лучшая цена" на главной странице</p>
+        <div class="two-columns">
+            <div class="sidebar">
+                <div style="background: white; border-radius: 20px; padding: 20px;">
+                    <h3>📦 Товары для сравнения</h3>
+                    <div id="bestPriceCartList" style="margin-top: 16px; min-height: 150px;">
+                        <p style="color: #999;">Нет товаров</p>
+                    </div>
+                    <button class="btn-yellow" id="startBestPriceSearch" style="width: 100%; margin-top: 16px;">📍 Найти лучшие цены рядом</button>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="map-placeholder" style="height: 280px;">🗺️ Карта с лучшими предложениями</div>
+                <div id="bestPriceShops" class="shop-list" style="margin-top: 16px;">
+                    <p style="color: gray; text-align: center;">Результаты появятся после поиска</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>📍 Fairview — честный взгляд на цены. Пользователи создают карточки товаров и делятся реальными ценами.</p>
+    <p style="margin-top: 8px;">© 2025 Fairview • Альфа-версия прототипа</p>
+</footer>
+
+<script>
+    // Начальные данные — карточки товаров
+    let products = [
+        { id: 1, name: "Молоко 3.2%", brand: "Простоквашино", price: 89.90, weight: "1 л", shop: "Пятёрочка (Тверская ул., 15)", likes: 47, dislikes: 2, img: "🥛", date: "2025-04-20" },
+        { id: 2, name: "Хлеб Бородинский", brand: "Коломенский", price: 49.90, weight: "350 г", shop: "Перекрёсток (Арбат, 10)", likes: 34, dislikes: 1, img: "🍞", date: "2025-04-19" },
+        { id: 3, name: "Яблоки Гренни Смит", brand: "Фрукт-Сервис", price: 129.90, weight: "1 кг", shop: "Ашан (ТЦ Европа)", likes: 29, dislikes: 3, img: "🍎", date: "2025-04-18" },
+        { id: 4, name: "Куриное филе", brand: "Троекурово", price: 249.90, weight: "500 г", shop: "Магнит (Ленина, 5)", likes: 52, dislikes: 4, img: "🍗", date: "2025-04-17" }
+    ];
+
+    // Корзины пользователя
+    let budgetCart = [];
+    let bestPriceCart = [];
+
+    // Сохранение в localStorage
+    function saveData() {
+        localStorage.setItem('products', JSON.stringify(products));
+        localStorage.setItem('budgetCart', JSON.stringify(budgetCart.map(p => p.id)));
+        localStorage.setItem('bestPriceCart', JSON.stringify(bestPriceCart.map(p => p.id)));
+    }
+
+    function loadData() {
+        const savedProducts = localStorage.getItem('products');
+        if (savedProducts) {
+            products = JSON.parse(savedProducts);
+        }
+        const savedBudget = localStorage.getItem('budgetCart');
+        if (savedBudget) {
+            const budgetIds = JSON.parse(savedBudget);
+            budgetCart = budgetIds.map(id => products.find(p => p.id === id)).filter(p => p);
+        }
+        const savedBest = localStorage.getItem('bestPriceCart');
+        if (savedBest) {
+            const bestIds = JSON.parse(savedBest);
+            bestPriceCart = bestIds.map(id => products.find(p => p.id === id)).filter(p => p);
+        }
+    }
+
+    // Отрисовка главной страницы
+    function renderProducts() {
+        const container = document.getElementById('popularProducts');
+        if (!container) return;
+        container.innerHTML = products.map(p => `
+            <div class="product-card" onclick="viewProduct(${p.id})">
+                <div class="product-img">${p.img}</div>
+                <div class="product-info">
+                    <div class="product-title">${escapeHtml(p.name)}</div>
+                    <div class="product-price">${p.price.toFixed(2)} ₽</div>
+                    <div class="product-meta">${escapeHtml(p.brand)} • ${p.weight}</div>
+                    <div class="product-meta">🏪 ${escapeHtml(p.shop)} • 📅 ${p.date}</div>
+                    <div class="reactions">
+                        <button onclick="event.stopPropagation(); likeProduct(${p.id})">👍 ${p.likes}</button>
+                        <button onclick="event.stopPropagation(); dislikeProduct(${p.id})">👎 ${p.dislikes}</button>
+                        <button onclick="event.stopPropagation(); addToBudgetCart(${p.id})" style="background:#f0f0f0;">➕ Бюджет</button>
+                        <button onclick="event.stopPropagation(); addToBestPriceCart(${p.id})" style="background:#f0f0f0;">🏷️ Лучшая цена</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function likeProduct(id) {
+        const p = products.find(x => x.id === id);
+        if(p) { p.likes++; renderProducts(); saveData(); }
+    }
+    function dislikeProduct(id) {
+        const p = products.find(x => x.id === id);
+        if(p) { p.dislikes++; renderProducts(); saveData(); }
+    }
+
+    function addToBudgetCart(id) {
+        const p = products.find(x => x.id === id);
+        if(p && !budgetCart.find(i => i.id === id)) {
+            budgetCart.push(p);
+            updateBudgetCartUI();
+            saveData();
+            showToast('✅ Товар добавлен в бюджетную корзину');
+        } else if (budgetCart.find(i => i.id === id)) {
+            showToast('⚠️ Товар уже в корзине');
+        }
+    }
+
+    function addToBestPriceCart(id) {
+        const p = products.find(x => x.id === id);
+        if(p && !bestPriceCart.find(i => i.id === id)) {
+            bestPriceCart.push(p);
+            updateBestPriceCartUI();
+            saveData();
+            showToast('✅ Товар добавлен для поиска лучшей цены');
+        } else if (bestPriceCart.find(i => i.id === id)) {
+            showToast('⚠️ Товар уже в списке');
+        }
+    }
+
+    function showToast(message) {
+        let toast = document.getElementById('toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.style.cssText = 'position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1D1D1D; color:white; padding:12px 24px; border-radius:50px; z-index:1000; font-size:14px; opacity:0; transition:0.3s; pointer-events:none;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+    }
+
+    function updateBudgetCartUI() {
+        const container = document.getElementById('budgetCartList');
+        if(container) {
+            if(budgetCart.length === 0) {
+                container.innerHTML = '<p style="color: #999;">Корзина пуста. Добавьте товары кнопкой "+ Бюджет" на главной.</p>';
+            } else {
+                const total = budgetCart.reduce((sum, p) => sum + p.price, 0);
+                container.innerHTML = budgetCart.map(p => `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">• ${p.name} — ${p.price.toFixed(2)} ₽</div>`).join('') + 
+                    `<div style="margin-top: 12px; padding-top: 8px; font-weight: 700; border-top: 2px solid var(--yellow);">Итого: ${total.toFixed(2)} ₽</div>`;
+            }
+        }
+    }
+
+    function updateBestPriceCartUI() {
+        const container = document.getElementById('bestPriceCartList');
+        if(container) {
+            if(bestPriceCart.length === 0) {
+                container.innerHTML = '<p style="color: #999;">Нет товаров. Добавьте через кнопку "+ Лучшая цена" на главной.</p>';
+            } else {
+                container.innerHTML = bestPriceCart.map(p => `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">• ${p.name}</div>`).join('');
+            }
+        }
+    }
+
+    window.viewProduct = function(id) {
+        const product = products.find(p => p.id === id);
+        if(!product) return;
+        const detailHtml = `
+            <div style="background: white; border-radius: 24px; padding: 28px;">
+                <div style="font-size: 80px; text-align: center; margin-bottom: 16px;">${product.img}</div>
+                <h1 style="margin-bottom: 16px;">${escapeHtml(product.name)}</h1>
+                <div style="display: grid; gap: 12px; margin-bottom: 24px;">
+                    <p><strong>🏷️ Бренд:</strong> ${escapeHtml(product.brand)}</p>
+                    <p><strong>⚖️ Характеристики:</strong> ${product.weight}</p>
+                    <p><strong>🥛 Пищевая ценность:</strong> ~60 ккал / 100 г</p>
+                    <p><strong>📋 Состав:</strong> Натуральные ингредиенты, без консервантов</p>
+                    <p><strong>💰 Цена:</strong> <span style="color: var(--red); font-size: 32px; font-weight: 800;">${product.price.toFixed(2)} ₽</span></p>
+                    <p><strong>🏪 Магазин:</strong> ${escapeHtml(product.shop)}</p>
+                    <p><strong>📅 Дата добавления:</strong> ${product.date}</p>
+                </div>
+                <div class="reactions" style="margin-top: 16px; justify-content: center;">
+                    <button onclick="likeProduct(${product.id}); showPage('home');">👍 Полезно (${product.likes})</button>
+                    <button onclick="dislikeProduct(${product.id}); showPage('home');">👎 Неправда (${product.dislikes})</button>
+                    <button onclick="addToBudgetCart(${product.id})">➕ В бюджет</button>
+                </div>
+                <h3 style="margin: 32px 0 16px 0;">💬 Комментарии пользователей</h3>
+                <div style="background: #f8f9fa; border-radius: 16px; padding: 16px;">
+                    <p><strong>Анна:</strong> Цена актуальна на 20.04 ✅</p>
+                    <p><strong>Иван:</strong> В соседнем магазине дешевле на 10 ₽</p>
+                    <p><strong>Мария:</strong> Отличное качество, беру постоянно</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('productDetailContainer').innerHTML = detailHtml;
+        showPage('product');
+    };
+
+    function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(`page-${pageId}`).classList.add('active');
+        if(pageId === 'home') renderProducts();
+        if(pageId === 'budget') updateBudgetCartUI();
+        if(pageId === 'bestprice') updateBestPriceCartUI();
+        window.scrollTo(0, 0);
+    }
+
+    // Симуляция поиска на карте для бюджета
+    document.getElementById('simulateSearchOnMap')?.addEventListener('click', () => {
+        const resultContainer = document.getElementById('mapShopResults');
+        const mapDiv = document.getElementById('budgetMap');
+        if(budgetCart.length === 0) {
+            resultContainer.innerHTML = '<p style="color: gray; text-align: center;">⚠️ Добавьте товары в корзину на главной странице</p>';
+            if(mapDiv) mapDiv.innerHTML = '🗺️ Карта: добавьте товары для поиска';
+            return;
+        }
+        const total = budgetCart.reduce((sum, p) => sum + p.price, 0);
+        if(mapDiv) mapDiv.innerHTML = `🗺️ <strong>Найдено 3 магазина</strong><br><small>📍 Радиус 3 км от центра</small>`;
+        resultContainer.innerHTML = `
+            <div class="shop-item"><strong>🏪 Пятёрочка</strong> <span>💰 ${(total * 0.95).toFixed(2)} ₽</span> <span>📍 300 м</span> <span style="color: green;">⭐ Лучшая цена</span></div>
+            <div class="shop-item"><strong>🏪 Перекрёсток</strong> <span>💰 ${total.toFixed(2)} ₽</span> <span>📍 650 м</span></div>
+            <div class="shop-item"><strong>🏪 Магнит</strong> <span>💰 ${(total * 1.02).toFixed(2)} ₽</span> <span>📍 1.2 км</span></div>
+        `;
+        showToast('🔍 Найдены магазины с вашими товарами');
+    });
+
+    // Поиск лучшей цены
+    document.getElementById('startBestPriceSearch')?.addEventListener('click', () => {
+        const container = document.getElementById('bestPriceShops');
+        if(bestPriceCart.length === 0) {
+            container.innerHTML = '<p style="color: gray; text-align: center;">⚠️ Добавьте товары через кнопку "+ Лучшая цена" на главной</p>';
+            return;
+        }
+        container.innerHTML = bestPriceCart.map(p => `
+            <div class="shop-item">
+                <strong>${escapeHtml(p.name)}</strong>
+                <span>💰 Лучшая цена: ${(p.price * 0.9).toFixed(2)} ₽</span>
+                <span>📍 ${escapeHtml(p.shop)}</span>
+            </div>
+        `).join('');
+        showToast('🏆 Найдены лучшие цены в радиусе 2 км');
+    });
+
+    // Создание карточки
+    document.getElementById('createCardBtnHome')?.addEventListener('click', () => showPage('create'));
+    document.getElementById('goToBudgetBtn')?.addEventListener('click', () => showPage('budget'));
+    document.getElementById('goToBestPriceBtn')?.addEventListener('click', () => showPage('bestprice'));
+
+    // Проверка дубликатов
+    function checkDuplicate() {
+        const name = document.getElementById('productName')?.value;
+        const shop = document.getElementById('shopSelect')?.value;
+        const exists = products.some(p => p.name.toLowerCase() === name?.toLowerCase() && p.shop === shop);
+        const warning = document.getElementById('duplicateWarning');
+        if(warning && name) warning.style.display = exists ? 'block' : 'none';
+        return exists;
+    }
+
+    document.getElementById('productName')?.addEventListener('input', checkDuplicate);
+    document.getElementById('shopSelect')?.addEventListener('change', checkDuplicate);
+
+    document.getElementById('createProductForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('productName').value;
+        const price = document.getElementById('productPrice').value;
+        const brand = document.getElementById('productBrand').value;
+        const weight = document.getElementById('productWeight').value;
+        
+        if(!name || !price) {
+            alert("❌ Пожалуйста, заполните название товара и цену");
+            return;
+        }
+        
+        if(checkDuplicate()) {
+            if(!confirm('⚠️ Такой товар уже есть в этом магазине. Всё равно создать новую карточку?')) {
+                return;
+            }
+        }
+        
+        const shop = document.getElementById('shopSelect').value;
+        const newId = products.length + 1;
+        const newProduct = {
+            id: newId,
+            name: name,
+            brand: brand || "Не указан",
+            price: parseFloat(price),
+            weight: weight || "Не указано",
+            shop: shop,
+            likes: 0,
+            dislikes: 0,
+            img: "🆕",
+            date: new Date().toISOString().slice(0,10)
+        };
+        products.push(newProduct);
+        renderProducts();
+        saveData();
+        alert(`✅ Карточка "${name}" успешно создана!`);
+        showPage('home');
+        e.target.reset();
+    });
+
+    // Инициализация
+    loadData();
+    renderProducts();
+    updateBudgetCartUI();
+    updateBestPriceCartUI();
+</script>
+</body>
+</html>
