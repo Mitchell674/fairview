@@ -3,625 +3,2418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Fairview - Честный взгляд на цены</title>
+    <meta name="description" content="Fairview - честный взгляд на цены с интерактивной картой. Сравнивайте цены, считайте КБЖУ, планируйте бюджет.">
+    <title>Fairview - Честный взгляд на цены с картой</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: #F5F5F5;
             color: #1D1D1D;
+            line-height: 1.4;
         }
 
-        /* Цветовая схема */
         :root {
-            --yellow: #FFC107;
-            --red: #E63946;
-            --black: #1D1D1D;
-            --white: #FFFFFF;
-            --gray-bg: #F5F5F5;
-            --gray-border: #E0E0E0;
+            --yellow: #FFC107; --red: #E63946; --black: #1D1D1D; --white: #FFFFFF;
+            --gray-bg: #F5F5F5; --gray-border: #E0E0E0; --green: #2E7D32; --blue: #1E88E5;
+            --focus-ring: 0 0 0 3px rgba(255, 193, 7, 0.5);
+            --z-header: 1000;
+            --z-dropdown: 1001;
+            --z-modal: 2000;
+            --z-toast: 1500;
+            --z-comparison: 999;
+            --z-map-controls: 500;
         }
 
-        /* Навигация между страницами */
-        .page {
-            display: none;
-            animation: fadeIn 0.3s ease;
+        *:focus-visible {
+            outline: 3px solid var(--yellow);
+            outline-offset: 2px;
+            border-radius: 4px;
         }
 
-        .page.active {
-            display: block;
-        }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Шапка */
+        .skip-link {
+            position: absolute; top: -100px; left: 16px; background: var(--yellow);
+            color: var(--black); padding: 8px 16px; z-index: 1001; border-radius: 0 0 8px 8px;
+            font-weight: 600; transition: top 0.3s; text-decoration: none;
+        }
+        .skip-link:focus { top: 0; }
+
         .header {
-            background: var(--black);
-            color: white;
-            padding: 16px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            background: var(--black); color: white; padding: 16px 32px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 12px; position: sticky; top: 0;
+            z-index: var(--z-header);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
 
         .logo {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
+            font-size: 28px; font-weight: 800; letter-spacing: -0.5px; cursor: pointer;
+            border: none; background: none; color: white;
         }
+        .logo span:first-child { color: var(--yellow); }
+        .logo span:last-child { color: var(--red); }
 
-        .logo span:first-child {
-            color: var(--yellow);
-        }
-        .logo span:last-child {
-            color: var(--red);
-        }
-
-        .search-bar {
-            flex: 1;
-            max-width: 400px;
-            display: flex;
-        }
-
+        .search-bar { flex: 1; max-width: 400px; display: flex; }
         .search-bar input {
-            width: 100%;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 30px 0 0 30px;
-            font-size: 14px;
+            width: 100%; padding: 10px 16px; border: none; border-radius: 30px 0 0 30px;
+            font-size: 14px; font-family: inherit;
         }
-
         .search-bar button {
-            background: var(--yellow);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 0 30px 30px 0;
-            cursor: pointer;
-            font-weight: 600;
-            color: var(--black);
+            background: var(--yellow); border: none; padding: 10px 20px;
+            border-radius: 0 30px 30px 0; cursor: pointer; font-weight: 600;
+            color: var(--black); transition: 0.2s; display: flex; align-items: center; gap: 4px;
+        }
+        .search-bar button:hover { background: #e0a800; }
+
+        .header-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        .cart-selector, .cart-icon, .location-selector {
+            background: rgba(255,255,255,0.1); padding: 8px 14px; border-radius: 40px;
+            display: flex; align-items: center; gap: 6px; cursor: pointer;
+            transition: 0.2s; border: none; color: white; font-family: inherit;
+            font-size: 14px; white-space: nowrap; position: relative;
+        }
+        .cart-selector:hover, .cart-icon:hover, .location-selector:hover {
+            background: rgba(255,255,255,0.2);
         }
 
-        .location-selector {
-            background: rgba(255,255,255,0.1);
-            padding: 8px 16px;
-            border-radius: 30px;
+        .autobuild-wrapper {
+            position: relative;
+        }
+
+        .autobuild-btn {
+            background: var(--green);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-weight: 600;
             font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
             display: flex;
             align-items: center;
             gap: 6px;
-            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+        .autobuild-btn:hover {
+            background: #1b5e20;
+        }
+        .autobuild-btn:focus-visible {
+            outline: 3px solid var(--yellow);
+            outline-offset: 2px;
         }
 
-        /* Основной контейнер */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px 32px;
-        }
-
-        /* Кнопки */
-        .btn-yellow {
-            background: var(--yellow);
+        .autobuild-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: auto;
+            background: white;
             color: var(--black);
-            border: none;
-            padding: 12px 24px;
-            border-radius: 40px;
-            font-weight: 700;
-            font-size: 16px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-yellow:hover {
-            background: #e0a800;
-            transform: scale(1.02);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--yellow);
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .btn-red {
-            background: var(--red);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 40px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        /* Карточки товаров */
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 24px;
-            margin-top: 24px;
-        }
-
-        .product-card {
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            transition: 0.2s;
-            cursor: pointer;
-        }
-        .product-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-        }
-        .product-img {
-            height: 180px;
-            background: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            background-size: cover;
-            background-position: center;
-        }
-        .product-info {
-            padding: 16px;
-        }
-        .product-title {
-            font-weight: 700;
-            font-size: 18px;
-        }
-        .product-price {
-            color: var(--red);
-            font-weight: 800;
-            font-size: 22px;
-            margin: 8px 0;
-        }
-        .product-meta {
-            font-size: 13px;
-            color: #666;
-            display: flex;
-            gap: 12px;
+            border-radius: 16px;
+            min-width: 280px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: var(--z-dropdown);
+            display: none;
             margin-top: 8px;
+            overflow: hidden;
         }
-        .reactions {
-            display: flex;
-            gap: 12px;
-            margin-top: 12px;
+        .autobuild-wrapper.active .autobuild-dropdown {
+            display: block;
         }
-        .reactions button {
-            background: none;
-            border: none;
-            font-size: 18px;
+        .autobuild-dropdown .autobuild-item {
+            padding: 14px 20px;
             cursor: pointer;
-        }
-
-        /* Карта (заглушка) */
-        .map-placeholder {
-            background: #e9ecef;
-            height: 400px;
-            border-radius: 24px;
+            transition: 0.2s;
             display: flex;
             align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            background-image: radial-gradient(circle, #bbb 1px, transparent 1px);
-            background-size: 20px 20px;
-            margin: 20px 0;
-        }
-
-        /* Две колонки */
-        .two-columns {
-            display: flex;
-            gap: 32px;
-            margin-top: 24px;
-            flex-wrap: wrap;
-        }
-        .sidebar {
-            flex: 1;
-            min-width: 260px;
-        }
-        .main-content {
-            flex: 2;
-            min-width: 300px;
-        }
-
-        /* Список магазинов */
-        .shop-list {
-            background: white;
-            border-radius: 20px;
-            padding: 16px;
-        }
-        .shop-item {
-            padding: 12px;
+            gap: 10px;
             border-bottom: 1px solid var(--gray-border);
+            font-weight: 500;
+            white-space: nowrap;
+            color: var(--black);
+        }
+        .autobuild-dropdown .autobuild-item:hover {
+            background: #f0f0f0;
+        }
+        .autobuild-dropdown .autobuild-item:last-child {
+            border-bottom: none;
+        }
+        .autobuild-dropdown .autobuild-item .strategy-desc {
+            font-size: 11px;
+            color: #666;
+            font-weight: 400;
+            white-space: normal;
+        }
+
+        .autobuild-preview {
+            background: #f8fdf8;
+            border: 1px solid #c8e6c9;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .autobuild-preview-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        .autobuild-preview-item:last-child {
+            border-bottom: none;
+        }
+        .autobuild-preview-total {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px solid var(--green);
+            font-weight: 700;
             display: flex;
             justify-content: space-between;
         }
 
-        /* Форма создания карточки */
-        .form-card {
+        .multi-cart-preview {
+            display: grid;
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .multi-cart-preview-item {
             background: white;
-            border-radius: 24px;
-            padding: 24px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            font-weight: 600;
-            display: block;
-            margin-bottom: 6px;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--gray-border);
+            border: 2px solid #e0e0e0;
             border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .multi-cart-preview-item:hover {
+            border-color: var(--yellow);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .multi-cart-preview-item.best {
+            border-color: var(--green);
+            background: #f1f8e9;
+        }
+        .multi-cart-preview-item.selected {
+            border-color: var(--blue);
+            background: #e3f2fd;
+        }
+
+        .cart-dropdown {
+            position: absolute; top: 100%; right: 0; background: white; color: var(--black);
+            border-radius: 16px; min-width: 260px; max-height: 400px; overflow-y: auto;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: var(--z-dropdown);
+            display: none;
+            margin-top: 8px;
+        }
+        .cart-selector.active .cart-dropdown { display: block; }
+
+        .cart-dropdown-item {
+            padding: 12px 16px; border-bottom: 1px solid var(--gray-border);
+            cursor: pointer; transition: 0.2s; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .cart-dropdown-item:hover { background: #f5f5f5; }
+        .cart-dropdown-item.active { background: var(--yellow); font-weight: 600; }
+        .cart-dropdown-item .delete-cart, .cart-dropdown-item .rename-cart-btn {
+            color: var(--red); background: none; border: none; cursor: pointer;
+            font-size: 16px; padding: 0 4px;
+        }
+        .cart-dropdown-item .rename-cart-btn { color: var(--blue); }
+        .create-cart-btn {
+            padding: 12px 16px; background: var(--yellow); text-align: center;
+            font-weight: 600; cursor: pointer;
+        }
+
+        .cart-count {
+            background: var(--red); color: white; border-radius: 30px; padding: 2px 8px;
+            font-size: 12px; font-weight: 700; min-width: 22px; text-align: center;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+        .btn {
+            border: none; padding: 10px 20px; border-radius: 40px; font-weight: 600;
+            cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 14px;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn:hover { transform: scale(1.02); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-yellow { background: var(--yellow); color: var(--black); }
+        .btn-outline { background: transparent; border: 2px solid var(--yellow); color: var(--black); }
+        .btn-outline:hover { background: var(--yellow); }
+        .btn-red { background: var(--red); color: white; }
+        .btn-green { background: var(--green); color: white; }
+        .btn-small { padding: 6px 12px; font-size: 13px; }
+
+        .product-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px; margin-top: 24px;
+        }
+        .product-card {
+            background: white; border-radius: 20px; overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: 0.2s; cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .product-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+        .product-card:focus-within { border-color: var(--yellow); }
+        .product-img {
+            height: 160px; background: #f8f9fa; display: flex;
+            align-items: center; justify-content: center; font-size: 64px;
+        }
+        .product-info { padding: 16px; }
+        .product-title { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+        .product-price { color: var(--red); font-weight: 800; font-size: 24px; margin: 8px 0; }
+        .product-meta { font-size: 13px; color: #666; display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+        .product-nutrition {
+            font-size: 11px; color: var(--green); margin-top: 6px;
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .reactions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .reactions button {
+            background: none; border: none; font-size: 13px; cursor: pointer;
+            padding: 6px 10px; border-radius: 30px; transition: 0.2s;
+            display: flex; align-items: center; gap: 4px; font-family: inherit;
+        }
+        .reactions button:hover { background: #f0f0f0; }
+
+        .map-container {
+            position: relative; border-radius: 24px; overflow: hidden;
+            margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        #map {
+            height: 500px; width: 100%; background: #e9ecef;
+            z-index: 1;
+        }
+        .map-controls {
+            position: absolute; top: 16px; right: 16px;
+            z-index: var(--z-map-controls);
+            display: flex; gap: 8px; background: white; padding: 8px;
+            border-radius: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .map-controls button {
+            background: white; border: none; padding: 10px 16px; border-radius: 32px;
+            cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s;
             font-family: inherit;
         }
+        .map-controls button:hover { background: var(--yellow); }
+
+        .leaflet-top, .leaflet-bottom {
+            z-index: var(--z-map-controls) !important;
+        }
+        .leaflet-control-geocoder {
+            z-index: var(--z-map-controls) !important;
+        }
+
+        .location-status {
+            background: white; padding: 8px 16px; border-radius: 40px; font-size: 13px;
+            display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .location-status.loading { background: #fff3cd; }
+        .location-status.error { background: #ffe0e0; color: var(--red); }
+        .location-status.success { background: #e8f5e9; color: var(--green); }
+
+        .shop-list-sidebar {
+            background: white; border-radius: 20px; padding: 20px;
+            max-height: 500px; overflow-y: auto;
+        }
+        .shop-list-item {
+            padding: 12px; border-bottom: 1px solid var(--gray-border);
+            cursor: pointer; transition: 0.2s; border-radius: 12px;
+        }
+        .shop-list-item:hover { background: #f5f5f5; }
+        .shop-list-item.best-price { background: #e8f5e9; border-left: 4px solid var(--green); }
+
+        .comparison-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: var(--black);
+            color: white; padding: 12px 24px;
+            z-index: var(--z-comparison);
+            display: flex; align-items: center; gap: 16px; justify-content: center;
+            transform: translateY(100%); transition: 0.3s;
+        }
+        .comparison-bar.active { transform: translateY(0); }
+        .comparison-item {
+            background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 20px;
+            display: flex; align-items: center; gap: 8px; font-size: 13px;
+        }
+        .comparison-item button {
+            background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px;
+        }
+
+        .comparison-table {
+            width: 100%; border-collapse: collapse; background: white; border-radius: 16px;
+            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--gray-border);
+            font-size: 14px;
+        }
+        .comparison-table th { background: #f8f9fa; font-weight: 600; color: #666; }
+        .comparison-table tr:last-child td { border-bottom: none; }
+        .comparison-table .best-value { color: var(--green); font-weight: 700; }
+
+        .price-chart { margin-top: 16px; background: white; border-radius: 16px; padding: 16px; }
+        .chart-bar {
+            display: flex; align-items: end; gap: 4px; height: 80px;
+            padding: 8px 0; border-bottom: 2px solid var(--gray-border);
+        }
+        .chart-column {
+            flex: 1; background: var(--blue); border-radius: 4px 4px 0 0;
+            min-width: 8px; transition: 0.3s; position: relative;
+        }
+        .chart-column:hover { background: var(--yellow); }
+        .chart-column .tooltip {
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            background: var(--black); color: white; padding: 4px 8px; border-radius: 4px;
+            font-size: 11px; white-space: nowrap; display: none;
+        }
+        .chart-column:hover .tooltip { display: block; }
+
+        .two-columns { display: flex; gap: 32px; margin-top: 24px; flex-wrap: wrap; }
+        .sidebar { flex: 1; min-width: 300px; }
+        .main-content { flex: 2; min-width: 300px; }
+
+        .cart-list, .shop-list { background: white; border-radius: 20px; padding: 20px; }
+
+        .cart-item {
+            padding: 16px 0; border-bottom: 1px solid var(--gray-border);
+            display: flex; justify-content: space-between; align-items: flex-start;
+            flex-wrap: wrap; gap: 12px;
+        }
+        .cart-item:last-child { border-bottom: none; }
+
+        .cart-item-main {
+            display: flex; align-items: center; gap: 12px; flex: 2; min-width: 200px;
+        }
+
+        .cart-item-details {
+            flex: 1;
+        }
+
+        .cart-item-name {
+            font-weight: 700; font-size: 16px; margin-bottom: 4px;
+        }
+
+        .cart-item-meta {
+            font-size: 13px; color: #666; margin-bottom: 6px;
+        }
+
+        .cart-item-nutrition {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            background: #f8fdf8; padding: 6px 10px; border-radius: 10px;
+            font-size: 12px; color: var(--green); margin-top: 4px;
+        }
+        .cart-item-nutrition span {
+            display: flex; align-items: center; gap: 2px;
+        }
+
+        .cart-item-price-section {
+            text-align: right; min-width: 100px;
+        }
+        .cart-item-price {
+            font-weight: 700; color: var(--red); font-size: 16px;
+        }
+        .cart-item-unit-price {
+            font-size: 12px; color: #666;
+        }
+
+        .quantity-control {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .quantity-btn {
+            width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--gray-border);
+            background: white; cursor: pointer; font-size: 16px; display: flex;
+            align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .quantity-btn:hover { background: #f0f0f0; border-color: var(--yellow); }
+
+        .cart-total {
+            margin-top: 16px; padding-top: 16px; border-top: 2px solid var(--yellow);
+            font-weight: 800; font-size: 20px; display: flex; justify-content: space-between;
+        }
+
+        .cart-nutrition-summary {
+            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+            border-radius: 16px; padding: 20px; margin-bottom: 20px;
+            border: 1px solid #c8e6c9;
+        }
+        .cart-nutrition-summary h4 {
+            margin-bottom: 12px; color: var(--green); font-size: 16px;
+        }
+        .cart-nutrition-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px; text-align: center;
+        }
+        .cart-nutrition-item .label {
+            font-size: 11px; color: #666; margin-bottom: 4px;
+        }
+        .cart-nutrition-item .value {
+            font-size: 20px; font-weight: 700; color: var(--green);
+        }
+
+        .nutrition-stats {
+            background: #e8f5e9; border-radius: 16px; padding: 16px; margin-top: 16px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px;
+        }
+        .nutrition-item { text-align: center; }
+        .nutrition-item .label { font-size: 12px; color: #666; }
+        .nutrition-item .value { font-size: 18px; font-weight: 700; color: var(--green); }
+
+        .form-card {
+            background: white; border-radius: 24px; padding: 28px;
+            max-width: 650px; margin: 0 auto;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { font-weight: 600; display: block; margin-bottom: 8px; }
+        input, select, textarea {
+            width: 100%; padding: 12px 16px; border: 1px solid var(--gray-border);
+            border-radius: 12px; font-family: inherit; font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--yellow); outline: none; box-shadow: var(--focus-ring);
+        }
+
         .warning {
-            background: #fff3cd;
-            border-left: 5px solid var(--yellow);
-            padding: 12px;
+            background: #fff3cd; border-left: 5px solid var(--yellow);
+            padding: 12px 16px; border-radius: 12px; margin-bottom: 20px; font-size: 14px;
+        }
+
+        .back-link {
+            display: inline-flex; align-items: center; gap: 8px; background: none;
+            border: none; font-size: 14px; font-weight: 500; cursor: pointer;
+            margin-bottom: 24px; color: var(--black); padding: 8px 12px; border-radius: 8px;
+        }
+        .back-link:hover { color: var(--red); background: #f0f0f0; }
+
+        .favorite-star {
+            cursor: pointer; font-size: 20px; transition: 0.2s; background: none; border: none;
+        }
+        .favorite-star.active { color: var(--yellow); }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: var(--z-modal);
+            align-items: center; justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white; border-radius: 24px; padding: 28px; max-width: 600px;
+            width: 90%; max-height: 85vh; overflow-y: auto; position: relative;
+        }
+        .modal-close {
+            position: absolute; top: 16px; right: 16px; background: none; border: none;
+            font-size: 24px; cursor: pointer; color: #999; padding: 4px 8px; border-radius: 50%;
+        }
+        .modal-close:hover { background: #f0f0f0; color: var(--red); }
+
+        .spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top-color: white; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast-container {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: var(--z-toast);
+            display: flex; flex-direction: column; gap: 8px; align-items: center;
+        }
+        .toast {
+            background: #1D1D1D; color: white; padding: 12px 24px; border-radius: 50px;
+            font-size: 14px; opacity: 0; transition: 0.3s; pointer-events: auto;
+            display: flex; align-items: center; gap: 12px;
+            white-space: pre-line; max-width: 90vw; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .toast.show { opacity: 1; }
+        .undo-btn {
+            background: var(--yellow); color: var(--black); border: none;
+            padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: 600;
+            font-size: 13px; font-family: inherit;
+        }
+        .undo-btn:hover { background: #e0a800; }
+
+        .profile-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .profile-tag {
+            background: #f0f0f0; padding: 6px 12px; border-radius: 20px; font-size: 12px;
+            cursor: pointer; transition: 0.2s; border: 1px solid transparent;
+        }
+        .profile-tag:hover { background: var(--yellow); border-color: var(--black); }
+        .profile-tag.active { background: var(--yellow); font-weight: 600; }
+
+        .mode-switch {
+            display: flex;
+            background: #f0f0f0;
             border-radius: 12px;
-            margin-bottom: 20px;
+            padding: 4px;
+            margin: 12px 0;
+        }
+        .mode-switch button {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: inherit;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+        .mode-switch button.active {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-weight: 700;
+            color: var(--green);
         }
 
         footer {
-            text-align: center;
-            padding: 32px;
-            color: #666;
-            border-top: 1px solid var(--gray-border);
-            margin-top: 48px;
+            text-align: center; padding: 32px; color: #666;
+            border-top: 1px solid var(--gray-border); margin-top: 48px; font-size: 14px;
         }
 
         @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .container {
-                padding: 16px;
+            .header { flex-direction: column; align-items: stretch; padding: 12px; }
+            .header-controls { justify-content: center; }
+            .container { padding: 16px; }
+            .two-columns { flex-direction: column; }
+            #map { height: 350px; }
+            .product-grid { grid-template-columns: 1fr; }
+            .modal-content { padding: 20px; }
+            .cart-item { flex-direction: column; }
+            .cart-item-price-section { text-align: left; }
+            .autobuild-dropdown {
+                left: auto;
+                right: 0;
             }
         }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="logo">
-        <span>Fair</span><span>view</span>
+<a href="#main-content" class="skip-link">Пропустить навигацию</a>
+
+<div class="header" role="banner">
+    <button class="logo" onclick="App.showPage('home')" aria-label="Fairview - на главную">
+        <span aria-hidden="true">Fair</span><span aria-hidden="true">view</span>
+    </button>
+    <div class="search-bar" role="search">
+        <label for="globalSearch" style="position:absolute;width:1px;height:1px;overflow:hidden;">Поиск товаров</label>
+        <input type="text" id="globalSearch" placeholder="Искать товар, бренд, магазин..." aria-label="Поиск товаров">
+        <button onclick="App.searchProducts()" aria-label="Найти">🔍</button>
     </div>
-    <div class="search-bar">
-        <input type="text" placeholder="Искать товар, бренд..." id="globalSearch">
-        <button>🔍</button>
-    </div>
-    <div class="location-selector" id="changeLocationBtn">
-        📍 Москва, Россия ▼
-    </div>
-</div>
-
-<!-- ================= СТРАНИЦА 1: ГЛАВНАЯ ================= -->
-<div id="page-home" class="page active">
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <h1>🍎 Сравнивай цены честно</h1>
-            <button class="btn-yellow" id="createCardBtnHome">+ Создать карточку товара</button>
-        </div>
-
-        <!-- Блок карты -->
-        <div class="map-placeholder">
-            🗺️ Интерактивная карта магазинов (заглушка)<br>
-            <small>📍 Ближайшие магазины с актуальными ценами</small>
-        </div>
-
-        <h2>⭐ Популярные товары</h2>
-        <div class="product-grid" id="popularProducts">
-            <!-- Карточки будут добавлены JS -->
-        </div>
-
-        <div style="margin-top: 32px; text-align: center;">
-            <button class="btn-outline" id="goToBudgetBtn">📊 Планировать бюджет в другой стране</button>
-            <button class="btn-outline" id="goToBestPriceBtn" style="margin-left: 12px;">🏷️ Найти лучшую цену</button>
-        </div>
-    </div>
-</div>
-
-<!-- ================= СТРАНИЦА 2: КАРТОЧКА ТОВАРА (ПРИМЕР) ================= -->
-<div id="page-product" class="page">
-    <div class="container">
-        <button class="btn-outline" onclick="showPage('home')" style="margin-bottom: 20px;">← Назад</button>
-        <div id="productDetailContainer">
-            <!-- Динамическое содержимое карточки -->
-        </div>
-    </div>
-</div>
-
-<!-- ================= СТРАНИЦА 3: СОЗДАНИЕ КАРТОЧКИ ================= -->
-<div id="page-create" class="page">
-    <div class="container">
-        <button class="btn-outline" onclick="showPage('home')" style="margin-bottom: 20px;">← На главную</button>
-        <div class="form-card">
-            <h2>📸 Создать карточку товара</h2>
-            <div class="warning" id="duplicateWarning" style="display: none;">
-                ⚠️ Такой товар уже существует в этом магазине! Вы можете перейти к существующей карточке.
+    <div class="header-controls">
+        <div class="autobuild-wrapper" id="autobuildWrapper">
+            <button class="autobuild-btn" id="autobuildBtn" aria-haspopup="true" aria-expanded="false" aria-label="Автосборка корзины">
+                🤖 Автосборка
+            </button>
+            <div class="autobuild-dropdown" id="autobuildDropdown" role="menu">
+                <div class="autobuild-item" role="menuitem" tabindex="0" onclick="App.openBudgetModal()">
+                    <span aria-hidden="true">💰</span> <div><strong>По бюджету</strong><div class="strategy-desc">Собрать корзину в рамках бюджета</div></div>
+                </div>
+                <div class="autobuild-item" role="menuitem" tabindex="0" onclick="App.openKbzhuModal()">
+                    <span aria-hidden="true">🥗</span> <div><strong>По КБЖУ</strong><div class="strategy-desc">Подбор по калориям и нутриентам</div></div>
+                </div>
+                <div style="padding: 12px 20px; border-top: 2px solid var(--gray-border); font-size: 12px; color: #666; background: #fafafa;">
+                    ⚡ Скоро: По фильтрам, По категориям
+                </div>
             </div>
-            <form id="createProductForm">
-                <div class="form-group">
-                    <label>Фото ценника *</label>
-                    <input type="file" accept="image/*">
-                </div>
-                <div class="form-group">
-                    <label>Магазин *</label>
-                    <select id="shopSelect">
-                        <option>Пятёрочка (Тверская ул., 15)</option>
-                        <option>Перекрёсток (Арбат, 10)</option>
-                        <option>Ашан (ТЦ Европа)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Название товара *</label>
-                    <input type="text" id="productName" placeholder="Например: Молоко Домик в деревне">
-                </div>
-                <div class="form-group">
-                    <label>Цена (₽) *</label>
-                    <input type="number" id="productPrice" placeholder="99.90">
-                </div>
-                <div class="form-group">
-                    <label>Производитель / Бренд</label>
-                    <input type="text" id="productBrand" placeholder="PepsiCo, Danone...">
-                </div>
-                <div class="form-group">
-                    <label>Вес / Объём</label>
-                    <input type="text" placeholder="1 л, 500 г...">
-                </div>
-                <button type="submit" class="btn-yellow">Опубликовать карточку</button>
-            </form>
         </div>
+        <div class="cart-selector" id="cartSelector" role="button" aria-haspopup="true" aria-expanded="false" tabindex="0">
+            🛍️ <span id="currentCartName">Моя корзина</span> ▼
+            <div class="cart-dropdown" id="cartDropdown" role="menu"></div>
+        </div>
+        <button class="cart-icon" onclick="App.showPage('cart')" aria-label="Перейти в корзину">
+            🛒 <span id="cartCount" class="cart-count" aria-live="polite">0</span>
+        </button>
+        <button class="location-selector" id="changeLocationBtn" aria-label="Изменить местоположение" onclick="App.requestLocation()">
+            📍 <span id="currentLocationDisplay">Определение...</span>
+        </button>
     </div>
 </div>
 
-<!-- ================= СТРАНИЦА 4: ПЛАНИРОВАНИЕ БЮДЖЕТА ================= -->
-<div id="page-budget" class="page">
-    <div class="container">
-        <button class="btn-outline" onclick="showPage('home')" style="margin-bottom: 20px;">← Назад</button>
-        <h2>✈️ Планирование бюджета в другой стране</h2>
-        <div class="two-columns">
-            <div class="sidebar">
-                <div style="background: white; border-radius: 20px; padding: 20px;">
-                    <h3>🛒 Виртуальная корзина</h3>
-                    <div id="budgetCartList">
-                        <p>Выберите товары на главной (⭐ добавить в бюджет)</p>
+<div id="main-content">
+    <!-- ГЛАВНАЯ -->
+    <div id="page-home" class="page active">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+                <h1 style="font-size: 28px;">🍎 Сравнивай цены честно</h1>
+                <button class="btn btn-yellow" id="createCardBtnHome">+ Создать карточку товара</button>
+            </div>
+            <div id="locationStatus" class="location-status loading">⏳ Определение вашего местоположения...</div>
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-controls">
+                    <button id="centerMapBtn" title="Моё местоположение" aria-label="Центрировать на моём местоположении">📍 Моё положение</button>
+                    <button id="refreshShopsBtn" title="Обновить магазины" aria-label="Обновить список магазинов">🔄 Обновить</button>
+                    <button id="toggleLayerBtn" title="Сменить слой карты" aria-label="Сменить слой карты">🗺️ Слой</button>
+                </div>
+            </div>
+            <div class="two-columns" style="margin-top: 24px;">
+                <div class="main-content">
+                    <div class="shop-list-sidebar">
+                        <h3>🏪 Ближайшие магазины</h3>
+                        <div id="shopsListContainer"><p style="color: gray; text-align: center; padding: 20px;">Загрузка магазинов...</p></div>
                     </div>
-                    <button class="btn-yellow" id="simulateSearchOnMap" style="width: 100%; margin-top: 16px;">Искать на карте</button>
+                </div>
+                <div class="sidebar">
+                    <div style="background: white; border-radius: 20px; padding: 20px;">
+                        <h3>📊 Ваша корзина</h3>
+                        <div id="cartSummaryPreview"><p style="color: #999;">Корзина пуста</p></div>
+                        <div id="cartTotalPreview" style="margin-top: 12px; font-weight: 700;"></div>
+                        <div id="cartNutritionPreview" style="margin-top: 8px;"></div>
+                        <button class="btn btn-outline btn-small" style="margin-top: 16px; width: 100%;" onclick="App.showPage('cart')">Управлять корзиной →</button>
+                    </div>
                 </div>
             </div>
-            <div class="main-content">
-                <div class="map-placeholder" style="height: 350px;">
-                    🗺️ Карта: магазины с выбранными товарами<br>
-                    <span id="mapResultLabel">Не выбрано товаров</span>
+            <h2 style="margin: 32px 0 16px 0;">⭐ Популярные товары</h2>
+            <div class="product-grid" id="popularProducts"></div>
+        </div>
+    </div>
+
+    <!-- КОРЗИНА -->
+    <div id="page-cart" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('home')">← На главную</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+                <h2>🛒 <span id="cartPageTitle">Виртуальная корзина</span></h2>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-outline btn-small" id="renameCurrentCartBtn">✏️ Переименовать</button>
+                    <button class="btn btn-outline btn-small" id="shareCartBtn" style="border-color: var(--blue); color: var(--blue);">🔗 Поделиться</button>
+                    <button class="btn btn-outline btn-small" id="deleteCurrentCartBtn" style="border-color: var(--red); color: var(--red);">🗑️ Удалить</button>
                 </div>
-                <div class="shop-list" id="mapShopResults" style="margin-top: 16px;">
-                    <p style="color: gray;">Результаты появятся после поиска</p>
+            </div>
+
+            <div class="cart-nutrition-summary" id="cartNutritionSummary">
+                <h4>🥗 Пищевая ценность корзины</h4>
+                <div class="cart-nutrition-grid" id="cartNutritionGrid">
+                    <div class="cart-nutrition-item">
+                        <div class="label">🥩 Белки</div>
+                        <div class="value">0 г</div>
+                    </div>
+                    <div class="cart-nutrition-item">
+                        <div class="label">🧈 Жиры</div>
+                        <div class="value">0 г</div>
+                    </div>
+                    <div class="cart-nutrition-item">
+                        <div class="label">🍚 Углеводы</div>
+                        <div class="value">0 г</div>
+                    </div>
+                    <div class="cart-nutrition-item">
+                        <div class="label">🔥 Калории</div>
+                        <div class="value">0 ккал</div>
+                    </div>
                 </div>
+            </div>
+
+            <div class="two-columns">
+                <div class="main-content">
+                    <div class="cart-list" id="cartItemsList"></div>
+                    <div style="margin-top: 24px; display: flex; gap: 16px; justify-content: flex-end; flex-wrap: wrap;">
+                        <button class="btn btn-outline" id="clearCartBtn">Очистить корзину</button>
+                        <button class="btn btn-yellow" id="checkoutBudgetBtn">📊 Спланировать бюджет</button>
+                        <button class="btn btn-red" id="checkoutBestPriceBtn">🏷️ Найти лучшие цены</button>
+                    </div>
+                </div>
+                <div class="sidebar">
+                    <div style="background: white; border-radius: 20px; padding: 20px; margin-bottom: 20px;">
+                        <h3>📊 Итого по корзине</h3>
+                        <div style="font-size: 28px; font-weight: 800; color: var(--red); margin: 12px 0;" id="cartTotalDisplay">0 ₽</div>
+                        <div id="nutritionStats" class="nutrition-stats"></div>
+                    </div>
+                    <div style="background: white; border-radius: 20px; padding: 20px;">
+                        <h3>💡 Что дальше?</h3>
+                        <p style="margin: 16px 0; color: #666;">Из корзины вы можете:</p>
+                        <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
+                            <li>Спланировать бюджет в другой стране</li>
+                            <li>Найти магазины с лучшими ценами</li>
+                            <li>Копировать товары между корзинами</li>
+                            <li>Сравнить цены в разных регионах</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТОВАР -->
+    <div id="page-product" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('home')">← Назад к списку</button>
+            <div id="productDetailContainer"></div>
+        </div>
+    </div>
+
+    <!-- СРАВНЕНИЕ -->
+    <div id="page-compare" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('home')">← На главную</button>
+            <h2 style="margin-bottom: 24px;">⚖️ Сравнение товаров</h2>
+            <div class="form-card">
+                <p style="margin-bottom: 16px; color: #666;">Выберите до 3 товаров для сравнения характеристик</p>
+                <div style="margin-bottom: 16px;">
+                    <label for="compareSelect">Добавить товар для сравнения</label>
+                    <select id="compareSelect">
+                        <option value="">-- Выберите товар --</option>
+                    </select>
+                    <button class="btn btn-yellow btn-small" style="margin-top: 8px;" onclick="App.addToComparison()">+ Добавить</button>
+                </div>
+                <div id="compareProductsList" style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;"></div>
+                <div id="comparisonTableContainer"></div>
+                <button class="btn btn-outline" onclick="App.clearComparison()" style="margin-top: 16px;">🗑️ Очистить сравнение</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- СОЗДАНИЕ -->
+    <div id="page-create" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('home')">← На главную</button>
+            <div class="form-card">
+                <h2 style="margin-bottom: 24px;">📸 Создать карточку товара</h2>
+                <form id="createProductForm">
+                    <div class="form-group"><label for="productName">Название товара *</label><input type="text" id="productName" required placeholder="Например: Молоко Домик в деревне"></div>
+                    <div class="form-group"><label for="productPrice">Цена (₽) *</label><input type="number" id="productPrice" step="0.01" required placeholder="99.90"></div>
+                    <div class="form-group"><label for="shopSelect">Магазин *</label><select id="shopSelect"><option>Пятёрочка</option><option>Перекрёсток</option><option>Ашан</option><option>Магнит</option><option>ВкусВилл</option><option>Лента</option></select></div>
+                    <div class="form-group"><label for="productBrand">Производитель / Бренд</label><input type="text" id="productBrand" placeholder="PepsiCo, Danone..."></div>
+                    <div class="form-group"><label for="productWeight">Вес / Объём</label><input type="text" id="productWeight" placeholder="1 л, 500 г"></div>
+                    <div class="form-group"><label for="protein">Белки (г на 100г/100мл)</label><input type="number" id="protein" step="0.1" placeholder="3.2"></div>
+                    <div class="form-group"><label for="fat">Жиры (г на 100г/100мл)</label><input type="number" id="fat" step="0.1" placeholder="2.5"></div>
+                    <div class="form-group"><label for="carbs">Углеводы (г на 100г/100мл)</label><input type="number" id="carbs" step="0.1" placeholder="4.8"></div>
+                    <div class="form-group"><label for="calories">Калории (ккал на 100г/100мл)</label><input type="number" id="calories" step="1" placeholder="60"></div>
+                    <button type="submit" class="btn btn-yellow" style="width: 100%;">📤 Опубликовать карточку</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- БЮДЖЕТ -->
+    <div id="page-budget" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('cart')">← Вернуться в корзину</button>
+            <h2 style="margin-bottom: 16px;">✈️ Планирование бюджета в другой стране</h2>
+            <div class="two-columns">
+                <div class="sidebar"><div class="cart-list"><h3>🛒 Ваша корзина</h3><div id="budgetCartPreview"></div><div id="budgetTotalPreview" style="margin-top: 16px; font-weight: 700;"></div></div></div>
+                <div class="main-content">
+                    <div id="budgetMap" style="height: 300px; background: #e9ecef; border-radius: 24px; display: flex; align-items: center; justify-content: center; flex-direction: column;">🗺️ Карта: поиск магазинов</div>
+                    <div style="margin-top: 16px;">
+                        <label for="countrySelect">🌍 Выбрать страну/город:</label>
+                        <select id="countrySelect"><option value="Москва, Россия">🇷🇺 Москва, Россия (₽)</option><option value="Минск, Беларусь">🇧🇾 Минск, Беларусь (Br)</option><option value="Алматы, Казахстан">🇰🇿 Алматы, Казахстан (₸)</option><option value="Стамбул, Турция">🇹🇷 Стамбул, Турция (₺)</option><option value="Берлин, Германия">🇩🇪 Берлин, Германия (€)</option></select>
+                        <button class="btn btn-yellow" id="simulateSearchOnMap" style="margin-top: 16px; width: 100%;">🔍 Найти магазины</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЛУЧШАЯ ЦЕНА -->
+    <div id="page-bestprice" class="page">
+        <div class="container">
+            <button class="back-link" onclick="App.showPage('cart')">← Вернуться в корзину</button>
+            <h2 style="margin-bottom: 16px;">🏆 Поиск лучшей цены</h2>
+            <div class="two-columns">
+                <div class="sidebar"><div class="cart-list"><h3>📦 Товары из корзины</h3><div id="bestPriceCartPreview"></div></div></div>
+                <div class="main-content"><div class="shop-list" id="bestPriceShops"></div><button class="btn btn-yellow" id="startBestPriceSearch" style="margin-top: 16px; width: 100%;">📍 Найти лучшие цены</button></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ================= СТРАНИЦА 5: ЛУЧШАЯ ЦЕНА ================= -->
-<div id="page-bestprice" class="page">
-    <div class="container">
-        <button class="btn-outline" onclick="showPage('home')" style="margin-bottom: 20px;">← Назад</button>
-        <h2>🏆 Поиск лучшей цены на товар</h2>
-        <div class="two-columns">
-            <div class="sidebar">
-                <div style="background: white; border-radius: 20px; padding: 20px;">
-                    <h3>📦 Корзина для сравнения</h3>
-                    <div id="bestPriceCartList">Товаров нет</div>
-                    <button class="btn-yellow" id="startBestPriceSearch" style="margin-top: 20px;">Найти лучшие цены в радиусе 3 км</button>
-                </div>
-            </div>
-            <div class="main-content">
-                <div class="map-placeholder" style="height: 300px;">📍 Карта с пинами магазинов</div>
-                <div id="bestPriceShops" class="shop-list" style="margin-top: 16px;"></div>
-            </div>
+<!-- БАР СРАВНЕНИЯ -->
+<div class="comparison-bar" id="comparisonBar">
+    <span style="font-weight: 600;">⚖️ Сравнение:</span>
+    <div id="comparisonBarItems" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;"></div>
+    <button class="btn btn-yellow btn-small" onclick="App.showPage('compare')">Сравнить</button>
+    <button class="btn btn-outline btn-small" style="color: white; border-color: white;" onclick="App.clearComparison()">Очистить</button>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО: БЮДЖЕТ -->
+<div id="budgetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle">
+    <div class="modal-content">
+        <button class="modal-close" aria-label="Закрыть" onclick="App.closeModal('budgetModal')">×</button>
+        <h3 id="budgetModalTitle">💰 Автосборка по бюджету</h3>
+        <p style="color: #666; margin: 12px 0;">Введите сумму и выберите источник товаров.</p>
+
+        <div class="mode-switch" id="budgetModeSwitch">
+            <button class="active" data-mode="single" onclick="App.setBudgetMode('single')">🏪 В одном магазине</button>
+            <button data-mode="multi" onclick="App.setBudgetMode('multi')">🔄 Сравнить магазины</button>
+        </div>
+
+        <div class="form-group">
+            <label for="budgetInput">Бюджет (₽) *</label>
+            <input type="text" id="budgetInput" placeholder="Например: 1000" inputmode="decimal" aria-describedby="budgetError">
+        </div>
+
+        <div class="form-group" id="budgetShopSelectGroup">
+            <label for="budgetShopSelect">Магазин</label>
+            <select id="budgetShopSelect">
+                <option value="">-- Все магазины поблизости --</option>
+            </select>
+        </div>
+
+        <div id="budgetError" style="color: var(--red); font-size: 13px; margin-top: 8px; display: none;" role="alert"></div>
+
+        <div id="budgetPreview" style="display: none;"></div>
+
+        <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <button class="btn btn-outline" onclick="App.closeModal('budgetModal')">Отмена</button>
+            <button class="btn btn-yellow" id="budgetModalPreviewBtn">👁️ Предпросмотр</button>
+            <button class="btn btn-green" id="budgetModalConfirmBtn"><span id="budgetSpinner" class="spinner" style="display: none;"></span>🤖 Собрать корзину</button>
         </div>
     </div>
 </div>
 
-<footer>
-    Fairview — честный взгляд на цены. Пользователи создают карточки товаров, делятся ценами.
+<!-- МОДАЛЬНОЕ ОКНО: КБЖУ -->
+<div id="kbzhuModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="kbzhuModalTitle">
+    <div class="modal-content">
+        <button class="modal-close" aria-label="Закрыть" onclick="App.closeModal('kbzhuModal')">×</button>
+        <h3 id="kbzhuModalTitle">🥗 Автосборка по КБЖУ</h3>
+        <p style="color: #666; margin: 12px 0;">Введите целевые значения. Оставьте пустым, если параметр не важен.</p>
+
+        <div class="mode-switch" id="kbzhuModeSwitch">
+            <button class="active" data-mode="single" onclick="App.setKbzhuMode('single')">🏪 В одном магазине</button>
+            <button data-mode="multi" onclick="App.setKbzhuMode('multi')">🔄 Сравнить магазины</button>
+        </div>
+
+        <div class="profile-tags" id="kbzhuProfiles">
+            <span class="profile-tag" onclick="App.applyNutritionProfile('weightLoss')">🔥 Похудение</span>
+            <span class="profile-tag" onclick="App.applyNutritionProfile('muscleGain')">💪 Набор массы</span>
+            <span class="profile-tag" onclick="App.applyNutritionProfile('keto')">🥑 Кето</span>
+            <span class="profile-tag" onclick="App.applyNutritionProfile('balanced')">⚖️ Сбалансированное</span>
+        </div>
+
+        <div class="form-group"><label for="kbzhuProteinInput">🥩 Белки (г)</label><input type="text" id="kbzhuProteinInput" placeholder="50" inputmode="decimal"></div>
+        <div class="form-group"><label for="kbzhuFatInput">🧈 Жиры (г)</label><input type="text" id="kbzhuFatInput" placeholder="50" inputmode="decimal"></div>
+        <div class="form-group"><label for="kbzhuCarbsInput">🍚 Углеводы (г)</label><input type="text" id="kbzhuCarbsInput" placeholder="200" inputmode="decimal"></div>
+        <div class="form-group"><label for="kbzhuCaloriesInput">🔥 Калории (ккал)</label><input type="text" id="kbzhuCaloriesInput" placeholder="1500" inputmode="numeric"></div>
+
+        <div class="form-group">
+            <label for="kbzhuStrategy">🧠 Стратегия подбора</label>
+            <select id="kbzhuStrategy">
+                <option value="greedy">Жадный алгоритм (быстрый)</option>
+                <option value="balanced">Сбалансированный по категориям</option>
+                <option value="maxProtein">Максимум белка</option>
+                <option value="random">Случайный набор</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="kbzhuShopSelectGroup">
+            <label for="kbzhuShopSelect">Магазин</label>
+            <select id="kbzhuShopSelect">
+                <option value="">-- Все магазины поблизости --</option>
+            </select>
+        </div>
+
+        <div id="kbzhuError" style="color: var(--red); font-size: 13px; margin-top: 8px; display: none;" role="alert"></div>
+
+        <div id="kbzhuPreview" style="display: none;"></div>
+
+        <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <button class="btn btn-outline" onclick="App.closeModal('kbzhuModal')">Отмена</button>
+            <button class="btn btn-yellow" id="kbzhuModalPreviewBtn">👁️ Предпросмотр</button>
+            <button class="btn btn-green" id="kbzhuModalConfirmBtn"><span id="kbzhuSpinner" class="spinner" style="display: none;"></span>🥗 Собрать корзину</button>
+        </div>
+    </div>
+</div>
+
+<div id="cartModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <button class="modal-close" aria-label="Закрыть" onclick="App.closeModal('cartModal')">×</button>
+        <h3 id="modalTitle">Создать новую корзину</h3>
+        <div class="form-group" style="margin-top: 20px;"><label for="cartNameInput">Название корзины</label><input type="text" id="cartNameInput" placeholder="Продукты на неделю" maxlength="50"></div>
+        <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <button class="btn btn-outline" onclick="App.closeModal('cartModal')">Отмена</button>
+            <button class="btn btn-yellow" id="modalConfirmBtn">Создать</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<footer role="contentinfo">
+    <p>📍 Fairview — честный взгляд на цены с интерактивной картой</p>
+    <p style="margin-top: 8px;">© 2025 Fairview • Виртуальные корзины, КБЖУ, карта магазинов</p>
 </footer>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script>
-    // Моковые товары
-    let products = [
-        { id: 1, name: "Молоко 3.2%", brand: "Простоквашино", price: 89.90, weight: "1 л", shop: "Пятёрочка", likes: 45, dislikes: 2, img: "🥛", date: "2025-04-20" },
-        { id: 2, name: "Хлеб Бородинский", brand: "Коломенский", price: 49.90, weight: "350 г", shop: "Перекрёсток", likes: 32, dislikes: 1, img: "🍞", date: "2025-04-19" },
-        { id: 3, name: "Яблоки Гренни", brand: "Фрукт-Сервис", price: 129.90, weight: "1 кг", shop: "Ашан", likes: 28, dislikes: 3, img: "🍎", date: "2025-04-18" }
-    ];
+    // ==================== МОДУЛЬ: УТИЛИТЫ ====================
+    const Utils = {
+        generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        },
 
-    // Любимые товары (для бюджета и лучшей цены)
-    let budgetCart = [];
-    let bestPriceCart = [];
+        escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+        },
 
-    function renderProducts() {
-        const container = document.getElementById('popularProducts');
-        if (!container) return;
-        container.innerHTML = products.map(p => `
-            <div class="product-card" onclick="viewProduct(${p.id})">
-                <div class="product-img" style="font-size:60px; background:#f9f9f9;">${p.img}</div>
-                <div class="product-info">
-                    <div class="product-title">${p.name}</div>
-                    <div class="product-price">${p.price} ₽</div>
-                    <div class="product-meta">${p.brand} • ${p.weight}</div>
-                    <div class="product-meta">🏪 ${p.shop} • 📅 ${p.date}</div>
-                    <div class="reactions">
-                        <button onclick="event.stopPropagation(); likeProduct(${p.id})">👍 ${p.likes}</button>
-                        <button onclick="event.stopPropagation(); dislikeProduct(${p.id})">👎 ${p.dislikes}</button>
-                        <button onclick="event.stopPropagation(); addToBudgetCart(${p.id})">➕ Бюджет</button>
-                        <button onclick="event.stopPropagation(); addToBestPriceCart(${p.id})">🏷️ Лучшая цена</button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
+        parseWeightToGrams(weightStr) {
+            if (!weightStr || typeof weightStr !== 'string') return 100;
+            const cleaned = weightStr.trim();
+            if (cleaned === '') return 100;
+            const normalized = cleaned.toLowerCase().replace(/,/g, '.');
+            const match = normalized.match(/^([\d.]+)\s*(г|кг|мл|л)?$/);
+            if (!match) return 100;
+            const value = parseFloat(match[1]);
+            const unit = match[2] || 'г';
+            if (isNaN(value) || value <= 0) return 100;
+            switch (unit) {
+                case 'кг': return value * 1000;
+                case 'л': return value * 1000;
+                case 'мл': return value;
+                default: return value;
+            }
+        },
 
-    function likeProduct(id) {
-        const p = products.find(x => x.id === id);
-        if(p) { p.likes++; renderProducts(); }
-    }
-    function dislikeProduct(id) {
-        const p = products.find(x => x.id === id);
-        if(p) { p.dislikes++; renderProducts(); }
-    }
+        getProductNutritionTotals(product) {
+            const multiplier = this.parseWeightToGrams(product.weight) / 100;
+            return {
+                protein: (product.protein || 0) * multiplier,
+                fat: (product.fat || 0) * multiplier,
+                carbs: (product.carbs || 0) * multiplier,
+                calories: (product.calories || 0) * multiplier
+            };
+        },
 
-    function addToBudgetCart(id) {
-        const p = products.find(x => x.id === id);
-        if(p && !budgetCart.find(i => i.id === id)) {
-            budgetCart.push(p);
-            updateBudgetCartUI();
+        hasCompleteNutritionData(product) {
+            return product.protein != null && product.fat != null &&
+                product.carbs != null && product.calories != null &&
+                !isNaN(product.protein) && !isNaN(product.fat) &&
+                !isNaN(product.carbs) && !isNaN(product.calories);
+        },
+
+        formatNutrition(nutrition) {
+            const parts = [];
+            if (nutrition.protein > 0) parts.push(`🥩${nutrition.protein.toFixed(1)}г`);
+            if (nutrition.fat > 0) parts.push(`🧈${nutrition.fat.toFixed(1)}г`);
+            if (nutrition.carbs > 0) parts.push(`🍚${nutrition.carbs.toFixed(1)}г`);
+            if (nutrition.calories > 0) parts.push(`🔥${Math.round(nutrition.calories)}ккал`);
+            return parts.join(' ');
+        },
+
+        validatePositiveNumber(value, allowEmpty = true) {
+            const trimmed = value.trim();
+            if (allowEmpty && trimmed === '') return { valid: true, value: Infinity };
+            const normalized = trimmed.replace(/,/g, '.');
+            const num = parseFloat(normalized);
+            if (isNaN(num) || num <= 0) return { valid: false, value: null };
+            return { valid: true, value: num };
+        },
+
+        validateInteger(value, allowEmpty = true) {
+            const trimmed = value.trim();
+            if (allowEmpty && trimmed === '') return { valid: true, value: Infinity };
+            const normalized = trimmed.replace(/,/g, '.');
+            const num = parseFloat(normalized);
+            if (isNaN(num) || num <= 0 || !Number.isInteger(num)) return { valid: false, value: null };
+            return { valid: true, value: num };
+        },
+
+        calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-    }
-
-    function addToBestPriceCart(id) {
-        const p = products.find(x => x.id === id);
-        if(p && !bestPriceCart.find(i => i.id === id)) {
-            bestPriceCart.push(p);
-            updateBestPriceCartUI();
-        }
-    }
-
-    function updateBudgetCartUI() {
-        const container = document.getElementById('budgetCartList');
-        if(container) {
-            if(budgetCart.length === 0) container.innerHTML = '<p>Корзина пуста. Добавьте товары через кнопку "➕ Бюджет" на главной.</p>';
-            else container.innerHTML = budgetCart.map(p => `<div>• ${p.name} - ${p.price}₽</div>`).join('');
-        }
-    }
-
-    function updateBestPriceCartUI() {
-        const container = document.getElementById('bestPriceCartList');
-        if(container) {
-            if(bestPriceCart.length === 0) container.innerHTML = 'Нет товаров для поиска лучшей цены';
-            else container.innerHTML = bestPriceCart.map(p => `<div>• ${p.name}</div>`).join('');
-        }
-    }
-
-    window.viewProduct = function(id) {
-        const product = products.find(p => p.id === id);
-        if(!product) return;
-        const detailHtml = `
-            <div style="background: white; border-radius: 24px; padding: 24px;">
-                <div style="font-size: 80px; text-align: center;">${product.img}</div>
-                <h1>${product.name}</h1>
-                <p><strong>Бренд:</strong> ${product.brand}</p>
-                <p><strong>Характеристики:</strong> ${product.weight}</p>
-                <p><strong>Состав:</strong> Молоко пастеризованное, витамины...</p>
-                <p><strong>Пищевая ценность:</strong> 60 ккал / 100 мл</p>
-                <p><strong>Цена:</strong> <span style="color: var(--red); font-size: 32px;">${product.price} ₽</span></p>
-                <p><strong>Магазин:</strong> ${product.shop}</p>
-                <div class="reactions" style="margin-top: 24px;">
-                    <button onclick="likeProduct(${product.id}); showPage('home');">👍 Полезно (${product.likes})</button>
-                    <button onclick="dislikeProduct(${product.id}); showPage('home');">👎 Неправда (${product.dislikes})</button>
-                    <button onclick="addToBudgetCart(${product.id}); alert('Добавлено в бюджет');">➕ В бюджет</button>
-                </div>
-                <h3>💬 Комментарии</h3>
-                <p>Анна: Цена актуальна на 20.04 ✅</p>
-                <p>Иван: В соседнем магазине дешевле на 10₽</p>
-            </div>
-        `;
-        document.getElementById('productDetailContainer').innerHTML = detailHtml;
-        showPage('product');
     };
 
-    function showPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(`page-${pageId}`).classList.add('active');
-        if(pageId === 'home') renderProducts();
-        if(pageId === 'budget') updateBudgetCartUI();
-        if(pageId === 'bestprice') updateBestPriceCartUI();
-    }
-
-    // Симуляция поиска на карте для планирования бюджета
-    document.getElementById('simulateSearchOnMap')?.addEventListener('click', () => {
-        const resultContainer = document.getElementById('mapShopResults');
-        if(budgetCart.length === 0) {
-            resultContainer.innerHTML = '<p>⚠️ Добавьте товары в корзину на главной странице (кнопка "➕ Бюджет")</p>';
-            document.getElementById('mapResultLabel').innerText = 'Нет товаров для поиска';
-            return;
+    // ==================== МОДУЛЬ: ХРАНИЛИЩЕ ====================
+    const Storage = {
+        get(key, fallback = null) {
+            try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+            catch { return fallback; }
+        },
+        set(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+            catch { return false; }
         }
-        document.getElementById('mapResultLabel').innerHTML = `🔍 Найдены магазины с товарами: ${budgetCart.map(p => p.name).join(', ')}`;
-        resultContainer.innerHTML = `
-            <div class="shop-item"><strong>Пятёрочка</strong> <span>💰 ${budgetCart.reduce((acc, p) => acc + p.price, 0)}₽ за корзину</span> <span>📍 300 м</span></div>
-            <div class="shop-item"><strong>Перекрёсток</strong> <span>💰 ${budgetCart.reduce((acc, p) => acc + p.price + 10, 0)}₽</span> <span>📍 650 м</span></div>
-            <div class="shop-item"><strong>Магнит</strong> <span>💰 ${budgetCart.reduce((acc, p) => acc + p.price - 5, 0)}₽ (лучшая цена)</span> <span>📍 1.2 км</span></div>
-        `;
-    });
+    };
 
-    document.getElementById('startBestPriceSearch')?.addEventListener('click', () => {
-        const container = document.getElementById('bestPriceShops');
-        if(bestPriceCart.length === 0) {
-            container.innerHTML = '<p>Добавьте товары через кнопку "🏷️ Лучшая цена" на главной</p>';
-            return;
+    // ==================== МОДУЛЬ: СОСТОЯНИЕ ====================
+    const State = {
+        map: null,
+        userMarker: null,
+        shopMarkers: [],
+        currentTileLayer: 'standard',
+        currentLayer: null,
+        userLocation: null,
+
+        products: [],
+        carts: [],
+        currentCartId: null,
+        favorites: [],
+        comparisonList: [],
+
+        previousCartState: null,
+        pendingCopyProductId: null,
+
+        budgetMode: 'single',
+        kbzhuMode: 'single',
+        autobuildPreviewData: null,
+
+        shopsGeoData: [
+            { id: 1, name: "Пятёрочка", lat: 55.751244, lng: 37.618423, address: "Тверская ул., 15", priceFactor: 0.95 },
+            { id: 2, name: "Перекрёсток", lat: 55.752544, lng: 37.608423, address: "Арбат, 10", priceFactor: 1.0 },
+            { id: 3, name: "Ашан", lat: 55.745244, lng: 37.628423, address: "ТЦ Европа", priceFactor: 0.92 },
+            { id: 4, name: "Магнит", lat: 55.758244, lng: 37.635423, address: "Ленина, 5", priceFactor: 0.98 },
+            { id: 5, name: "ВкусВилл", lat: 55.748244, lng: 37.615423, address: "Новый Арбат, 20", priceFactor: 1.05 },
+            { id: 6, name: "Лента", lat: 55.741244, lng: 37.625423, address: "Кутузовский пр., 30", priceFactor: 0.93 }
+        ],
+
+        nutritionProfiles: {
+            weightLoss: { protein: 120, fat: 40, carbs: 100, calories: 1500 },
+            muscleGain: { protein: 180, fat: 60, carbs: 300, calories: 2800 },
+            keto: { protein: 100, fat: 150, carbs: 20, calories: 2000 },
+            balanced: { protein: 80, fat: 60, carbs: 200, calories: 2000 }
+        },
+
+        priceHistory: {},
+
+        getNearbyShops() {
+            if (!this.userLocation) return this.shopsGeoData;
+            return this.shopsGeoData.map(s => ({
+                ...s,
+                distance: Utils.calculateDistance(
+                    this.userLocation.lat, this.userLocation.lng, s.lat, s.lng
+                )
+            })).filter(s => s.distance <= 10).sort((a, b) => a.distance - b.distance);
+        },
+
+        getFilteredProducts(shopName = null) {
+            let products = [...this.products];
+            if (shopName) {
+                products = products.filter(p => p.shop === shopName);
+            }
+            return products;
+        },
+
+        saveCarts() {
+            Storage.set('fairview_carts', this.carts);
+            Storage.set('fairview_current_cart', this.currentCartId);
+        },
+
+        saveProducts() { Storage.set('fairview_products', this.products); },
+        saveFavorites() { Storage.set('fairview_favorites', this.favorites); },
+
+        getCurrentCart() { return this.carts.find(c => c.id === this.currentCartId); },
+
+        getCartItems() {
+            const cart = this.getCurrentCart();
+            if (!cart) return [];
+            return cart.items.map(item => {
+                const product = this.products.find(p => p.id === item.id);
+                return { ...item, product };
+            }).filter(item => item.product);
+        },
+
+        getCartTotal() {
+            return this.getCartItems().reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+        },
+
+        getCartCount() {
+            const cart = this.getCurrentCart();
+            return cart ? cart.items.reduce((s, i) => s + i.quantity, 0) : 0;
+        },
+
+        getCartNutrition() {
+            const items = this.getCartItems();
+            let p = 0, f = 0, c = 0, cal = 0;
+            items.forEach(item => {
+                const n = Utils.getProductNutritionTotals(item.product);
+                p += n.protein * item.quantity;
+                f += n.fat * item.quantity;
+                c += n.carbs * item.quantity;
+                cal += n.calories * item.quantity;
+            });
+            return { protein: p, fat: f, carbs: c, calories: Math.round(cal) };
+        },
+
+        savePreviousCartState() {
+            const cart = this.getCurrentCart();
+            if (cart) {
+                this.previousCartState = {
+                    cartId: cart.id,
+                    items: JSON.parse(JSON.stringify(cart.items))
+                };
+            }
+        },
+
+        generatePriceHistory(productId) {
+            if (!this.priceHistory[productId]) {
+                const product = this.products.find(p => p.id === productId);
+                if (!product) return [];
+                const history = [];
+                let price = product.price * (0.85 + Math.random() * 0.3);
+                for (let i = 30; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    price += (Math.random() - 0.5) * price * 0.05;
+                    price = Math.max(price, product.price * 0.7);
+                    history.push({ date: date.toISOString().slice(0, 10), price: Math.round(price * 100) / 100 });
+                }
+                this.priceHistory[productId] = history;
+            }
+            return this.priceHistory[productId];
         }
-        container.innerHTML = bestPriceCart.map(p => `
-            <div class="shop-item"><strong>Лучшая цена на ${p.name}:</strong> 
-            <span>${p.price}₽ в магазине ${p.shop} (2,1 км от вас)</span></div>
-        `).join('');
-    });
+    };
 
-    document.getElementById('createCardBtnHome')?.addEventListener('click', () => showPage('create'));
-    document.getElementById('goToBudgetBtn')?.addEventListener('click', () => showPage('budget'));
-    document.getElementById('goToBestPriceBtn')?.addEventListener('click', () => showPage('bestprice'));
+    // ==================== МОДУЛЬ: УВЕДОМЛЕНИЯ ====================
+    const Toast = {
+        show(message, duration = 3000, showUndo = false) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = message.replace(/\n/g, '<br>');
+            if (showUndo) {
+                const btn = document.createElement('button');
+                btn.className = 'undo-btn';
+                btn.textContent = '↩️ Откатить';
+                btn.onclick = () => { App.undoAutoBuild(); toast.remove(); };
+                toast.appendChild(btn);
+            }
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);
+        },
 
-    document.getElementById('createProductForm')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = document.getElementById('productName').value;
-        const price = document.getElementById('productPrice').value;
-        const brand = document.getElementById('productBrand').value;
-        if(!name || !price) {
-            alert("Заполните название и цену");
-            return;
+        showUndoable(message) { this.show(message, 8000, true); }
+    };
+
+    // ==================== МОДУЛЬ: КАРТА ====================
+    const MapModule = {
+        init() {
+            const mapEl = document.getElementById('map');
+            if (!mapEl) return;
+
+            State.map = L.map('map', { zoomControl: false }).setView([55.751244, 37.618423], 13);
+            L.control.zoom({ position: 'bottomright' }).addTo(State.map);
+
+            const layers = {
+                standard: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OSM & CartoDB', subdomains: 'abcd', maxZoom: 19
+                }),
+                satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: '&copy; Esri', maxZoom: 18
+                }),
+                dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OSM & CartoDB', subdomains: 'abcd', maxZoom: 19
+                })
+            };
+
+            State.currentLayer = layers.standard;
+            State.currentLayer.addTo(State.map);
+
+            L.Control.geocoder({
+                defaultMarkGeocode: false,
+                placeholder: 'Поиск адреса...',
+                position: 'topleft'
+            }).on('markgeocode', (e) => {
+                const center = e.geocode.center;
+                State.map.setView(center, 15);
+                State.userLocation = center;
+                if (State.userMarker) State.userMarker.setLatLng(center);
+                else this.createUserMarker(center);
+                this.updateLocationDisplay(center.lat, center.lng);
+                App.findNearbyShops(center.lat, center.lng);
+            }).addTo(State.map);
+
+            this.requestGeolocation();
+        },
+
+        requestGeolocation() {
+            if (!navigator.geolocation) {
+                this.setLocationStatus('⚠️ Геолокация не поддерживается. Используем центр Москвы.', 'error');
+                App.findNearbyShops(55.751244, 37.618423);
+                return;
+            }
+
+            this.setLocationStatus('⏳ Определение вашего местоположения...', 'loading');
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    State.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    State.map.setView([State.userLocation.lat, State.userLocation.lng], 14);
+                    this.createUserMarker(State.userLocation);
+                    this.updateLocationDisplay(State.userLocation.lat, State.userLocation.lng);
+                    App.findNearbyShops(State.userLocation.lat, State.userLocation.lng);
+                    this.setLocationStatus('📍 Местоположение определено', 'success');
+                },
+                (err) => {
+                    console.warn('Геолокация отклонена:', err.message);
+                    this.setLocationStatus('⚠️ Геолокация отклонена. Используем центр Москвы. Нажмите для повторной попытки.', 'error');
+                    App.findNearbyShops(55.751244, 37.618423);
+                }
+            );
+        },
+
+        createUserMarker(latLng) {
+            if (State.userMarker) State.userMarker.remove();
+            State.userMarker = L.marker([latLng.lat, latLng.lng], {
+                icon: L.divIcon({ html: '📍', iconSize: [28, 28], className: 'user-marker', popupAnchor: [0, -14] })
+            }).addTo(State.map).bindPopup('<strong>Вы здесь</strong><br>Ваше текущее местоположение').openPopup();
+        },
+
+        updateLocationDisplay(lat, lng) {
+            const el = document.getElementById('currentLocationDisplay');
+            if (el) el.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        },
+
+        setLocationStatus(message, type) {
+            const el = document.getElementById('locationStatus');
+            if (!el) return;
+            el.innerHTML = message;
+            el.className = 'location-status ' + type;
+        },
+
+        switchTileLayer() {
+            const names = ['standard', 'satellite', 'dark'];
+            const idx = (names.indexOf(State.currentTileLayer) + 1) % 3;
+            State.currentTileLayer = names[idx];
+
+            const configs = {
+                standard: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '&copy; OSM & CartoDB', zoom: 19 },
+                satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri', zoom: 18 },
+                dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '&copy; OSM & CartoDB', zoom: 19 }
+            };
+
+            const cfg = configs[State.currentTileLayer];
+            State.currentLayer.remove();
+            State.currentLayer = L.tileLayer(cfg.url, { attribution: cfg.attr, maxZoom: cfg.zoom });
+            State.currentLayer.addTo(State.map);
+
+            const btn = document.getElementById('toggleLayerBtn');
+            if (btn) btn.textContent = State.currentTileLayer === 'satellite' ? '🛰️ Спутник' : State.currentTileLayer === 'dark' ? '🌙 Тёмная' : '🗺️ Стандарт';
+        },
+
+        centerOnUser() {
+            if (State.userLocation) {
+                State.map.setView([State.userLocation.lat, State.userLocation.lng], 15);
+                if (State.userMarker) State.userMarker.openPopup();
+                Toast.show('📍 Карта центрирована');
+            } else {
+                this.requestGeolocation();
+            }
+        },
+
+        centerOnShop(lat, lng, name) {
+            State.map.setView([lat, lng], 16);
+            Toast.show(`📍 ${name} выбран на карте`);
         }
-        const shop = document.getElementById('shopSelect').value;
-        const newId = products.length + 1;
-        products.push({
-            id: newId, name, brand: brand || "No brand", price: parseFloat(price), weight: "не указано", shop, likes: 0, dislikes: 0, img: "🆕", date: new Date().toISOString().slice(0,10)
-        });
-        renderProducts();
-        alert(`Карточка "${name}" создана!`);
-        showPage('home');
+    };
+
+    // ==================== МОДУЛЬ: СТРАТЕГИИ АВТОСБОРКИ ====================
+    const AutoBuildStrategies = {
+        greedy(products) { return [...products]; },
+
+        balanced(products) {
+            const result = [], used = new Set();
+            const cats = [
+                p => ['🥩','🍗','🧀','🥚','🐟'].some(e => p.img?.includes(e)) || (p.protein > 15),
+                p => ['🍞','🍚','🍝','🥔'].some(e => p.img?.includes(e)) || (p.carbs > 30),
+                p => ['🍎','🥬','🥕','🍅','🥒'].some(e => p.img?.includes(e)),
+                p => ['🥛','🧈'].some(e => p.img?.includes(e))
+            ];
+            let ci = 0;
+            while (result.length < products.length) {
+                const item = products.find(p => !used.has(p.id) && cats[ci % cats.length](p)) ||
+                    products.find(p => !used.has(p.id));
+                if (item) { result.push(item); used.add(item.id); } else break;
+                ci++;
+            }
+            return result;
+        },
+
+        maxProtein(products) {
+            return [...products].sort((a, b) => {
+                const aR = (a.protein || 0) / Math.max((a.calories || 1), 1);
+                const bR = (b.protein || 0) / Math.max((b.calories || 1), 1);
+                return bR - aR;
+            });
+        },
+
+        random(products) {
+            const arr = [...products];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+    };
+
+    // ==================== МОДУЛЬ: АВТОСБОРКА ====================
+    const AutoBuild = {
+        getProductPool(shopName = null) {
+            let products = [...State.products];
+            if (shopName) {
+                products = products.filter(p => p.shop === shopName);
+            }
+            return products;
+        },
+
+        getAdjustedPrice(product, shopName = null) {
+            if (!shopName) return product.price;
+            const shop = State.shopsGeoData.find(s => s.name === shopName);
+            return product.price * (shop ? shop.priceFactor : 1);
+        },
+
+        byBudget(maxBudget, shopName = null, showUndo = true) {
+            const products = this.getProductPool(shopName);
+            if (!products.length) return { success: false, message: '❌ Нет товаров в выбранном магазине', items: [], total: 0 };
+
+            const sorted = [...products].sort((a, b) => {
+                const priceA = this.getAdjustedPrice(a, shopName);
+                const priceB = this.getAdjustedPrice(b, shopName);
+                return priceA - priceB;
+            });
+
+            const items = [];
+            let total = 0;
+
+            for (const p of sorted) {
+                const adjPrice = this.getAdjustedPrice(p, shopName);
+                if (total + adjPrice <= maxBudget) {
+                    const ex = items.find(i => i.id === p.id);
+                    ex ? ex.quantity++ : items.push({ id: p.id, quantity: 1 });
+                    total += adjPrice;
+                }
+            }
+
+            if (!items.length) return {
+                success: false,
+                message: `❌ Бюджет меньше минимальной цены (${this.getAdjustedPrice(sorted[0], shopName)?.toFixed(2) || 0} ₽)`,
+                items: [],
+                total: 0
+            };
+
+            return { success: true, items, total, message: `💰 ${items.reduce((s,i)=>s+i.quantity,0)} товаров на ${total.toFixed(2)} ₽` };
+        },
+
+        byNutrition(tp, tf, tc, tcal, strategy = 'greedy', shopName = null, showUndo = true) {
+            const products = this.getProductPool(shopName);
+            if (!products.length) return { success: false, message: '❌ Нет товаров в выбранном магазине', items: [], nutrition: null };
+
+            const all = products.filter(p => Utils.hasCompleteNutritionData(p));
+            const excl = products.filter(p => !Utils.hasCompleteNutritionData(p));
+
+            if (!all.length) return { success: false, message: `❌ Нет товаров с данными КБЖУ${excl.length ? ` (${excl.length} без данных)` : ''}`, items: [], nutrition: null };
+
+            const sorted = (AutoBuildStrategies[strategy] || AutoBuildStrategies.greedy)(all);
+
+            const items = [];
+            let cp=0, cf=0, cc=0, ccal=0;
+
+            for (const p of sorted) {
+                const n = Utils.getProductNutritionTotals(p);
+                if ((tp===Infinity||cp+n.protein<=tp+0.01) && (tf===Infinity||cf+n.fat<=tf+0.01) &&
+                    (tc===Infinity||cc+n.carbs<=tc+0.01) && (tcal===Infinity||ccal+n.calories<=tcal+0.5)) {
+                    const ex = items.find(i=>i.id===p.id);
+                    ex ? ex.quantity++ : items.push({id:p.id,quantity:1});
+                    cp+=n.protein; cf+=n.fat; cc+=n.carbs; ccal+=n.calories;
+                }
+            }
+
+            const warn = excl.length ? `\n⚠️ ${excl.length} товаров без КБЖУ пропущено` : '';
+
+            return {
+                success: items.length > 0,
+                items,
+                nutrition: {protein:cp, fat:cf, carbs:cc, calories:Math.round(ccal)},
+                message: items.length > 0
+                    ? `🥗 ${items.reduce((s,i)=>s+i.quantity,0)} товаров\nБ:${cp.toFixed(1)} Ж:${cf.toFixed(1)} У:${cc.toFixed(1)} К:${Math.round(ccal)}${warn}`
+                    : `❌ Не подобрать. Увеличьте лимиты.${warn}`
+            };
+        },
+
+        buildForMultipleShops(params, type = 'budget') {
+            const nearbyShops = State.getNearbyShops();
+            const results = [];
+
+            for (const shop of nearbyShops) {
+                let result;
+                if (type === 'budget') {
+                    result = this.byBudget(params.budget, shop.name, false);
+                } else {
+                    result = this.byNutrition(
+                        params.protein, params.fat, params.carbs, params.calories,
+                        params.strategy, shop.name, false
+                    );
+                }
+
+                if (result.success && result.items.length > 0) {
+                    const adjustedTotal = result.items.reduce((sum, item) => {
+                        const product = State.products.find(p => p.id === item.id);
+                        return sum + (product ? this.getAdjustedPrice(product, shop.name) * item.quantity : 0);
+                    }, 0);
+
+                    results.push({
+                        shopName: shop.name,
+                        shopAddress: shop.address,
+                        items: result.items,
+                        total: adjustedTotal,
+                        nutrition: result.nutrition || null,
+                        priceFactor: shop.priceFactor
+                    });
+                }
+            }
+
+            results.sort((a, b) => a.total - b.total);
+            return results;
+        },
+
+        applyToCart(items, cartId = null) {
+            const cart = cartId
+                ? State.carts.find(c => c.id === cartId)
+                : State.getCurrentCart();
+
+            if (!cart) return false;
+
+            State.savePreviousCartState();
+            cart.items = JSON.parse(JSON.stringify(items));
+            State.saveCarts();
+            App.updateCartUI();
+            return true;
+        },
+
+        applyMultipleCarts(results, baseName = 'Автосборка') {
+            State.savePreviousCartState();
+
+            const createdCarts = [];
+
+            for (const result of results) {
+                const cartName = `${result.shopName}: ${baseName}`;
+                const newCart = {
+                    id: Utils.generateId(),
+                    name: cartName,
+                    items: JSON.parse(JSON.stringify(result.items)),
+                    createdAt: new Date().toISOString(),
+                    isFavorite: false
+                };
+                State.carts.push(newCart);
+                createdCarts.push(newCart);
+            }
+
+            State.saveCarts();
+
+            if (createdCarts.length > 0) {
+                State.currentCartId = createdCarts[0].id;
+                State.saveCarts();
+            }
+
+            App.updateCartUI();
+            return createdCarts;
+        }
+    };
+
+    // ==================== ГЛАВНЫЙ МОДУЛЬ ====================
+    const App = {
+        init() {
+            State.products = Storage.get('fairview_products', [
+                { id: 1, name: "Молоко 3.2%", brand: "Простоквашино", price: 89.90, weight: "1 л", shop: "Пятёрочка", likes: 47, dislikes: 2, img: "🥛", date: "2025-04-20", protein: 3.2, fat: 3.5, carbs: 4.8, calories: 62 },
+                { id: 2, name: "Хлеб Бородинский", brand: "Коломенский", price: 49.90, weight: "350 г", shop: "Перекрёсток", likes: 34, dislikes: 1, img: "🍞", date: "2025-04-19", protein: 6.8, fat: 1.2, carbs: 45.5, calories: 220 },
+                { id: 3, name: "Яблоки Гренни Смит", brand: "Фрукт-Сервис", price: 129.90, weight: "1 кг", shop: "Ашан", likes: 29, dislikes: 3, img: "🍎", date: "2025-04-18", protein: 0.3, fat: 0.2, carbs: 14.5, calories: 52 },
+                { id: 4, name: "Куриное филе", brand: "Троекурово", price: 249.90, weight: "500 г", shop: "Магнит", likes: 52, dislikes: 4, img: "🍗", date: "2025-04-17", protein: 23.0, fat: 1.8, carbs: 0, calories: 110 },
+                { id: 5, name: "Сыр Российский", brand: "Белебеевский", price: 189.90, weight: "200 г", shop: "Перекрёсток", likes: 38, dislikes: 2, img: "🧀", date: "2025-04-16", protein: 24.5, fat: 30.0, carbs: 0, calories: 360 }
+            ]);
+            State.carts = Storage.get('fairview_carts');
+            if (!State.carts?.length) State.carts = [{ id: Utils.generateId(), name: "Моя корзина", items: [], createdAt: new Date().toISOString(), isFavorite: true }];
+            State.currentCartId = Storage.get('fairview_current_cart') || State.carts[0].id;
+            State.favorites = Storage.get('fairview_favorites', []);
+
+            MapModule.init();
+            this.renderProducts();
+            this.updateCartUI();
+            this.bindEvents();
+            this.showPage('home');
+        },
+
+        bindEvents() {
+            document.getElementById('createCardBtnHome')?.addEventListener('click', () => this.showPage('create'));
+            document.getElementById('centerMapBtn')?.addEventListener('click', () => MapModule.centerOnUser());
+            document.getElementById('refreshShopsBtn')?.addEventListener('click', () => this.refreshShops());
+            document.getElementById('toggleLayerBtn')?.addEventListener('click', () => MapModule.switchTileLayer());
+            document.getElementById('changeLocationBtn')?.addEventListener('click', () => MapModule.requestGeolocation());
+            document.getElementById('clearCartBtn')?.addEventListener('click', () => this.clearCart());
+            document.getElementById('checkoutBudgetBtn')?.addEventListener('click', () => this.showPage('budget'));
+            document.getElementById('checkoutBestPriceBtn')?.addEventListener('click', () => this.showPage('bestprice'));
+            document.getElementById('renameCurrentCartBtn')?.addEventListener('click', () => this.openRenameModal());
+            document.getElementById('deleteCurrentCartBtn')?.addEventListener('click', () => this.deleteCart(State.currentCartId));
+            document.getElementById('shareCartBtn')?.addEventListener('click', () => this.shareCart());
+
+            document.getElementById('budgetModalPreviewBtn')?.addEventListener('click', () => this.previewBudgetAutoBuild());
+            document.getElementById('kbzhuModalPreviewBtn')?.addEventListener('click', () => this.previewKbzhuAutoBuild());
+            document.getElementById('budgetModalConfirmBtn')?.addEventListener('click', () => this.executeBudgetAutoBuild());
+            document.getElementById('kbzhuModalConfirmBtn')?.addEventListener('click', () => this.executeKbzhuAutoBuild());
+
+            document.getElementById('budgetInput')?.addEventListener('keydown', (e) => { if (e.key==='Enter') this.previewBudgetAutoBuild(); });
+            document.getElementById('kbzhuCaloriesInput')?.addEventListener('keydown', (e) => { if (e.key==='Enter') this.previewKbzhuAutoBuild(); });
+
+            document.getElementById('cartSelector')?.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCartDropdown(); });
+            document.getElementById('autobuildBtn')?.addEventListener('click', (e) => { e.stopPropagation(); this.toggleAutoBuildDropdown(); });
+
+            document.addEventListener('click', () => {
+                document.getElementById('cartSelector')?.classList.remove('active');
+                document.getElementById('autobuildWrapper')?.classList.remove('active');
+            });
+
+            document.getElementById('createProductForm')?.addEventListener('submit', (e) => this.handleCreateProduct(e));
+            document.getElementById('globalSearch')?.addEventListener('input', () => this.searchProducts());
+            document.getElementById('modalConfirmBtn')?.addEventListener('click', () => this.handleCartModalConfirm());
+            document.getElementById('startBestPriceSearch')?.addEventListener('click', () => this.searchBestPrice());
+            document.getElementById('simulateSearchOnMap')?.addEventListener('click', () => this.simulateBudgetSearch());
+
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey||e.metaKey) && e.key==='z' && State.previousCartState && !document.querySelector('.modal.active')) {
+                    e.preventDefault(); this.undoAutoBuild();
+                }
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal.active').forEach(m => this.closeModal(m.id));
+                }
+            });
+
+            document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', (e) => { if (e.target===m) this.closeModal(m.id); }));
+            document.getElementById('locationStatus')?.addEventListener('click', (e) => {
+                if (e.target.closest('.location-status.error')) MapModule.requestGeolocation();
+            });
+        },
+
+        setBudgetMode(mode) {
+            State.budgetMode = mode;
+            const switchEl = document.getElementById('budgetModeSwitch');
+            if (switchEl) {
+                switchEl.querySelectorAll('button').forEach(b => {
+                    b.classList.toggle('active', b.dataset.mode === mode);
+                });
+            }
+
+            const shopGroup = document.getElementById('budgetShopSelectGroup');
+            if (shopGroup) {
+                shopGroup.style.display = mode === 'single' ? 'block' : 'none';
+            }
+
+            const preview = document.getElementById('budgetPreview');
+            if (preview) {
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+            }
+        },
+
+        setKbzhuMode(mode) {
+            State.kbzhuMode = mode;
+            const switchEl = document.getElementById('kbzhuModeSwitch');
+            if (switchEl) {
+                switchEl.querySelectorAll('button').forEach(b => {
+                    b.classList.toggle('active', b.dataset.mode === mode);
+                });
+            }
+
+            const shopGroup = document.getElementById('kbzhuShopSelectGroup');
+            if (shopGroup) {
+                shopGroup.style.display = mode === 'single' ? 'block' : 'none';
+            }
+
+            const preview = document.getElementById('kbzhuPreview');
+            if (preview) {
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+            }
+        },
+
+        updateShopSelects() {
+            const shops = State.getNearbyShops();
+            const options = '<option value="">-- Все магазины поблизости --</option>' +
+                shops.map(s => `<option value="${s.name}">${s.name} (≈${s.distance?.toFixed(1) || '?'} км)</option>`).join('');
+
+            const budgetSelect = document.getElementById('budgetShopSelect');
+            const kbzhuSelect = document.getElementById('kbzhuShopSelect');
+
+            if (budgetSelect) budgetSelect.innerHTML = options;
+            if (kbzhuSelect) kbzhuSelect.innerHTML = options;
+        },
+
+        showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${id}`)?.classList.add('active');
+            if (id==='home') { this.renderProducts(); this.updateCartSummaryPreview(); if(State.map) setTimeout(()=>State.map.invalidateSize(),100); }
+            if (id==='cart') this.renderCartPage();
+            if (id==='compare') this.renderComparisonPage();
+            window.scrollTo(0,0);
+        },
+
+        openModal(id) {
+            const m = document.getElementById(id);
+            if (m) {
+                m.classList.add('active');
+                const i = m.querySelector('input');
+                if (i) setTimeout(() => i.focus(), 100);
+                this.updateShopSelects();
+            }
+        },
+
+        closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('active');
+                const previewId = id === 'budgetModal' ? 'budgetPreview' : 'kbzhuPreview';
+                const preview = document.getElementById(previewId);
+                if (preview) {
+                    preview.style.display = 'none';
+                    preview.innerHTML = '';
+                }
+            }
+        },
+
+        openBudgetModal() {
+            if(!State.products.length){Toast.show('❌ Нет товаров');return;}
+            document.getElementById('budgetInput').value='';
+            document.getElementById('budgetError').style.display='none';
+            document.getElementById('budgetPreview').style.display='none';
+            this.setBudgetMode('single');
+            this.updateShopSelects();
+            this.openModal('budgetModal');
+            document.getElementById('autobuildWrapper')?.classList.remove('active');
+        },
+
+        openKbzhuModal() {
+            if(!State.products.length){Toast.show('❌ Нет товаров');return;}
+            ['kbzhuProteinInput','kbzhuFatInput','kbzhuCarbsInput','kbzhuCaloriesInput'].forEach(id=>document.getElementById(id).value='');
+            document.getElementById('kbzhuError').style.display='none';
+            document.getElementById('kbzhuPreview').style.display='none';
+            document.getElementById('kbzhuStrategy').value='greedy';
+            document.querySelectorAll('#kbzhuProfiles .profile-tag').forEach(t=>t.classList.remove('active'));
+            this.setKbzhuMode('single');
+            this.updateShopSelects();
+            this.openModal('kbzhuModal');
+            document.getElementById('autobuildWrapper')?.classList.remove('active');
+        },
+
+        previewBudgetAutoBuild() {
+            const v = Utils.validatePositiveNumber(document.getElementById('budgetInput').value, false);
+            const e = document.getElementById('budgetError');
+
+            if (!v.valid) {
+                e.textContent = '❌ Введите положительное число';
+                e.style.display = 'block';
+                return;
+            }
+            e.style.display = 'none';
+
+            const shopName = State.budgetMode === 'single'
+                ? document.getElementById('budgetShopSelect')?.value || null
+                : null;
+
+            let previewHtml = '';
+
+            if (State.budgetMode === 'multi') {
+                const results = AutoBuild.buildForMultipleShops({ budget: v.value }, 'budget');
+
+                if (!results.length) {
+                    previewHtml = '<p style="color: var(--red); text-align: center;">❌ Не удалось собрать корзины ни для одного магазина</p>';
+                } else {
+                    previewHtml = '<div class="multi-cart-preview">';
+                    results.forEach((r, idx) => {
+                        const bestClass = idx === 0 ? ' best' : '';
+                        previewHtml += `
+                        <div class="multi-cart-preview-item${bestClass}" onclick="App.selectMultiCartPreview(this, 'budget')">
+                            <strong>🏪 ${r.shopName}</strong>
+                            <span style="float: right; font-weight: 700; color: var(--red);">${r.total.toFixed(2)} ₽</span>
+                            <div style="font-size: 12px; color: #666;">📦 ${r.items.reduce((s,i) => s+i.quantity, 0)} товаров • 📍 ${r.shopAddress}</div>
+                            ${idx === 0 ? '<div style="font-size: 11px; color: var(--green); margin-top: 4px;">🏆 Лучшая цена</div>' : ''}
+                        </div>`;
+                    });
+                    previewHtml += '</div>';
+                    previewHtml += '<p style="font-size: 12px; color: #666; margin-top: 8px;">Нажмите на вариант для выбора, затем «Собрать корзину»</p>';
+                }
+            } else {
+                const result = AutoBuild.byBudget(v.value, shopName, false);
+
+                if (!result.success || !result.items || result.items.length === 0) {
+                    previewHtml = `<p style="color: var(--red); text-align: center;">${result.message || '❌ Не удалось подобрать товары'}</p>`;
+                } else {
+                    previewHtml = this.buildSinglePreviewHtml(result, shopName);
+                }
+            }
+
+            const preview = document.getElementById('budgetPreview');
+            preview.innerHTML = previewHtml;
+            preview.style.display = 'block';
+            State.autobuildPreviewData = { type: 'budget', shopName };
+        },
+
+        previewKbzhuAutoBuild() {
+            const pV = Utils.validatePositiveNumber(document.getElementById('kbzhuProteinInput').value);
+            const fV = Utils.validatePositiveNumber(document.getElementById('kbzhuFatInput').value);
+            const cV = Utils.validatePositiveNumber(document.getElementById('kbzhuCarbsInput').value);
+            const calV = Utils.validateInteger(document.getElementById('kbzhuCaloriesInput').value);
+            const strat = document.getElementById('kbzhuStrategy').value;
+            const e = document.getElementById('kbzhuError');
+
+            const errs = [];
+            if (!pV.valid) errs.push('Белки: введите положительное число');
+            if (!fV.valid) errs.push('Жиры: введите положительное число');
+            if (!cV.valid) errs.push('Углеводы: введите положительное число');
+            if (!calV.valid) errs.push('Калории: введите целое число');
+
+            if (errs.length) {
+                e.innerHTML = errs.join('<br>');
+                e.style.display = 'block';
+                return;
+            }
+
+            if (pV.value === Infinity && fV.value === Infinity && cV.value === Infinity && calV.value === Infinity) {
+                e.textContent = '❌ Укажите хотя бы один параметр';
+                e.style.display = 'block';
+                return;
+            }
+            e.style.display = 'none';
+
+            const shopName = State.kbzhuMode === 'single'
+                ? document.getElementById('kbzhuShopSelect')?.value || null
+                : null;
+
+            let previewHtml = '';
+
+            if (State.kbzhuMode === 'multi') {
+                const results = AutoBuild.buildForMultipleShops(
+                    { protein: pV.value, fat: fV.value, carbs: cV.value, calories: calV.value, strategy: strat },
+                    'nutrition'
+                );
+
+                if (!results.length) {
+                    previewHtml = '<p style="color: var(--red); text-align: center;">❌ Не удалось собрать корзины ни для одного магазина</p>';
+                } else {
+                    previewHtml = '<div class="multi-cart-preview">';
+                    results.forEach((r, idx) => {
+                        const bestClass = idx === 0 ? ' best' : '';
+                        previewHtml += `
+                        <div class="multi-cart-preview-item${bestClass}" onclick="App.selectMultiCartPreview(this, 'kbzhu')">
+                            <strong>🏪 ${r.shopName}</strong>
+                            <span style="float: right; font-weight: 700; color: var(--red);">${r.total.toFixed(2)} ₽</span>
+                            <div style="font-size: 12px; color: #666;">📦 ${r.items.reduce((s,i) => s+i.quantity, 0)} товаров • 📍 ${r.shopAddress}</div>
+                            ${r.nutrition ? `<div style="font-size: 11px; color: var(--green);">${Utils.formatNutrition(r.nutrition)}</div>` : ''}
+                            ${idx === 0 ? '<div style="font-size: 11px; color: var(--green); margin-top: 4px;">🏆 Лучшая цена</div>' : ''}
+                        </div>`;
+                    });
+                    previewHtml += '</div>';
+                    previewHtml += '<p style="font-size: 12px; color: #666; margin-top: 8px;">Нажмите на вариант для выбора, затем «Собрать корзину»</p>';
+                }
+            } else {
+                const result = AutoBuild.byNutrition(pV.value, fV.value, cV.value, calV.value, strat, shopName, false);
+
+                if (!result.success || !result.items || result.items.length === 0) {
+                    previewHtml = `<p style="color: var(--red); text-align: center;">${result.message || '❌ Не удалось подобрать товары'}</p>`;
+                } else {
+                    previewHtml = this.buildSinglePreviewHtml(result, shopName);
+                }
+            }
+
+            const preview = document.getElementById('kbzhuPreview');
+            preview.innerHTML = previewHtml;
+            preview.style.display = 'block';
+            State.autobuildPreviewData = {
+                type: 'kbzhu',
+                params: { protein: pV.value, fat: fV.value, carbs: cV.value, calories: calV.value, strategy: strat },
+                shopName
+            };
+        },
+
+        buildSinglePreviewHtml(result, shopName) {
+            if (!result || !result.items || result.items.length === 0) {
+                return '<p style="color: var(--red); text-align: center;">❌ Нет данных для отображения</p>';
+            }
+
+            let html = '<div class="autobuild-preview">';
+            html += '<strong>📋 Предварительный состав корзины:</strong>';
+
+            result.items.forEach(item => {
+                const product = State.products.find(p => p.id === item.id);
+                if (product) {
+                    const price = shopName
+                        ? AutoBuild.getAdjustedPrice(product, shopName)
+                        : product.price;
+                    html += `
+                    <div class="autobuild-preview-item">
+                        <span>${product.img} ${Utils.escapeHtml(product.name)} x${item.quantity}</span>
+                        <span style="font-weight: 600;">${(price * item.quantity).toFixed(2)} ₽</span>
+                    </div>`;
+                }
+            });
+
+            const totalItems = result.items.reduce((s, i) => s + i.quantity, 0);
+            const totalPrice = result.total || result.items.reduce((sum, item) => {
+                const product = State.products.find(p => p.id === item.id);
+                if (!product) return sum;
+                const price = shopName ? AutoBuild.getAdjustedPrice(product, shopName) : product.price;
+                return sum + price * item.quantity;
+            }, 0);
+
+            html += `
+            <div class="autobuild-preview-total">
+                <span>📦 ${totalItems} товаров</span>
+                <span>💰 ${totalPrice.toFixed(2)} ₽</span>
+            </div>`;
+
+            if (result.nutrition) {
+                html += `<div style="font-size: 12px; color: var(--green); margin-top: 8px;">${Utils.formatNutrition(result.nutrition)}</div>`;
+            }
+
+            html += '</div>';
+            return html;
+        },
+
+        selectMultiCartPreview(element, modalType) {
+            const parent = element.parentElement;
+            parent.querySelectorAll('.multi-cart-preview-item').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        },
+
+        executeBudgetAutoBuild() {
+            const v = Utils.validatePositiveNumber(document.getElementById('budgetInput').value, false);
+            const e = document.getElementById('budgetError');
+
+            if (!v.valid) {
+                e.textContent = '❌ Введите положительное число';
+                e.style.display = 'block';
+                return;
+            }
+            e.style.display = 'none';
+
+            const btn = document.getElementById('budgetModalConfirmBtn');
+            const spinner = document.getElementById('budgetSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+
+            setTimeout(() => {
+                let message = '';
+
+                if (State.budgetMode === 'multi') {
+                    const results = AutoBuild.buildForMultipleShops({ budget: v.value }, 'budget');
+
+                    if (!results.length) {
+                        message = '❌ Не удалось собрать корзины';
+                    } else {
+                        const created = AutoBuild.applyMultipleCarts(results, `Бюджет ${v.value.toFixed(0)} ₽`);
+                        message = `🔄 Создано ${created.length} корзин\n🏆 Лучшая: ${created[0].name}\n💰 ${results[0].total.toFixed(2)} ₽`;
+                    }
+                } else {
+                    const shopName = document.getElementById('budgetShopSelect')?.value || null;
+                    const result = AutoBuild.byBudget(v.value, shopName, true);
+
+                    if (!result.success) {
+                        message = result.message;
+                    } else {
+                        AutoBuild.applyToCart(result.items);
+                        const shopInfo = shopName ? ` в ${shopName}` : '';
+                        const remaining = (v.value - result.total).toFixed(2);
+                        message = `💰 Готово${shopInfo}!\n📦 ${result.items.reduce((s,i)=>s+i.quantity,0)} товаров\n💵 ${result.total.toFixed(2)} ₽\n💰 Остаток: ${remaining} ₽`;
+                    }
+                }
+
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                this.closeModal('budgetModal');
+
+                if (State.budgetMode === 'multi' || message.includes('Готово')) {
+                    Toast.showUndoable(message);
+                } else {
+                    Toast.show(message);
+                }
+
+                this.showPage('cart');
+            }, 150);
+        },
+
+        executeKbzhuAutoBuild() {
+            const pV = Utils.validatePositiveNumber(document.getElementById('kbzhuProteinInput').value);
+            const fV = Utils.validatePositiveNumber(document.getElementById('kbzhuFatInput').value);
+            const cV = Utils.validatePositiveNumber(document.getElementById('kbzhuCarbsInput').value);
+            const calV = Utils.validateInteger(document.getElementById('kbzhuCaloriesInput').value);
+            const strat = document.getElementById('kbzhuStrategy').value;
+            const e = document.getElementById('kbzhuError');
+
+            const errs = [];
+            if (!pV.valid) errs.push('Белки: введите положительное число');
+            if (!fV.valid) errs.push('Жиры: введите положительное число');
+            if (!cV.valid) errs.push('Углеводы: введите положительное число');
+            if (!calV.valid) errs.push('Калории: введите целое число');
+
+            if (errs.length) {
+                e.innerHTML = errs.join('<br>');
+                e.style.display = 'block';
+                return;
+            }
+
+            if (pV.value === Infinity && fV.value === Infinity && cV.value === Infinity && calV.value === Infinity) {
+                e.textContent = '❌ Укажите хотя бы один параметр';
+                e.style.display = 'block';
+                return;
+            }
+            e.style.display = 'none';
+
+            const btn = document.getElementById('kbzhuModalConfirmBtn');
+            const spinner = document.getElementById('kbzhuSpinner');
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+
+            setTimeout(() => {
+                let message = '';
+
+                if (State.kbzhuMode === 'multi') {
+                    const results = AutoBuild.buildForMultipleShops(
+                        { protein: pV.value, fat: fV.value, carbs: cV.value, calories: calV.value, strategy: strat },
+                        'nutrition'
+                    );
+
+                    if (!results.length) {
+                        message = '❌ Не удалось собрать корзины';
+                    } else {
+                        const created = AutoBuild.applyMultipleCarts(results, 'КБЖУ-подбор');
+                        message = `🔄 Создано ${created.length} корзин\n🏆 Лучшая: ${created[0].name}`;
+                        if (results[0].nutrition) {
+                            message += `\n${Utils.formatNutrition(results[0].nutrition)}`;
+                        }
+                    }
+                } else {
+                    const shopName = document.getElementById('kbzhuShopSelect')?.value || null;
+                    const result = AutoBuild.byNutrition(pV.value, fV.value, cV.value, calV.value, strat, shopName, true);
+
+                    if (!result.success) {
+                        message = result.message;
+                    } else {
+                        AutoBuild.applyToCart(result.items);
+                        const pct = (v, t) => t === Infinity ? '' : ` (${((v/t)*100).toFixed(0)}%)`;
+                        const fmt = v => v === Infinity ? '∞' : v.toFixed(1);
+                        message = `🥗 Готово!\n📦 ${result.items.reduce((s,i)=>s+i.quantity,0)} товаров\n🧠 ${strat}\n\n`;
+                        message += `🥩 ${result.nutrition.protein.toFixed(1)}/${fmt(pV.value)}г${pct(result.nutrition.protein, pV.value)}\n`;
+                        message += `🧈 ${result.nutrition.fat.toFixed(1)}/${fmt(fV.value)}г${pct(result.nutrition.fat, fV.value)}\n`;
+                        message += `🍚 ${result.nutrition.carbs.toFixed(1)}/${fmt(cV.value)}г${pct(result.nutrition.carbs, cV.value)}\n`;
+                        message += `🔥 ${result.nutrition.calories}/${fmt(calV.value)}ккал${pct(result.nutrition.calories, calV.value)}`;
+                    }
+                }
+
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                this.closeModal('kbzhuModal');
+
+                if (State.kbzhuMode === 'multi' || message.includes('Готово')) {
+                    Toast.showUndoable(message);
+                } else {
+                    Toast.show(message);
+                }
+
+                this.showPage('cart');
+            }, 150);
+        },
+
+        undoAutoBuild() {
+            if(!State.previousCartState){Toast.show('❌ Нет данных');return;}
+            const c=State.carts.find(c=>c.id===State.previousCartState.cartId);
+            if(c){c.items=JSON.parse(JSON.stringify(State.previousCartState.items));State.saveCarts();this.updateCartUI();Toast.show('↩️ Отменено');}
+            State.previousCartState=null;
+        },
+
+        requestLocation(){MapModule.requestGeolocation();},
+
+        addToCart(id){
+            const c=State.getCurrentCart();if(!c)return;
+            const ex=c.items.find(i=>i.id===id);
+            ex?ex.quantity++:c.items.push({id,quantity:1});
+            State.saveCarts();this.updateCartUI();this.refreshShops();Toast.show('✅ Добавлено');
+        },
+
+        removeFromCart(id){
+            const c=State.getCurrentCart();if(!c)return;
+            const idx=c.items.findIndex(i=>i.id===id);
+            if(idx!==-1){c.items[idx].quantity>1?c.items[idx].quantity--:c.items.splice(idx,1);}
+            State.saveCarts();this.updateCartUI();this.refreshShops();
+        },
+
+        clearCart(){
+            if(!confirm('Очистить корзину?'))return;
+            const c=State.getCurrentCart();if(c){c.items=[];State.saveCarts();this.updateCartUI();this.refreshShops();Toast.show('🗑️ Очищено');}
+        },
+
+        createCart(name){
+            if(!name?.trim())name=`Корзина от ${new Date().toLocaleDateString()}`;
+            const c={id:Utils.generateId(),name:name.trim(),items:[],createdAt:new Date().toISOString(),isFavorite:false};
+            State.carts.push(c);State.currentCartId=c.id;State.saveCarts();this.updateCartUI();Toast.show(`✅ "${c.name}"`);
+        },
+
+        renameCart(id,name){
+            const c=State.carts.find(c=>c.id===id);
+            if(c&&name?.trim()){c.name=name.trim();State.saveCarts();this.updateCartUI();return true;}
+            return false;
+        },
+
+        deleteCart(id){
+            if(State.carts.length===1){Toast.show('❌ Нельзя удалить последнюю');return;}
+            const c=State.carts.find(c=>c.id===id);
+            if(c&&confirm(`Удалить "${c.name}"?`)){
+                State.carts=State.carts.filter(c=>c.id!==id);
+                if(State.currentCartId===id)State.currentCartId=State.carts[0].id;
+                State.saveCarts();this.updateCartUI();Toast.show('🗑️ Удалена');
+            }
+        },
+
+        switchCart(id){State.currentCartId=id;State.saveCarts();this.updateCartUI();},
+
+        shareCart(){
+            const c=State.getCurrentCart();
+            if(!c?.items.length){Toast.show('❌ Пусто');return;}
+            const d=btoa(JSON.stringify({name:c.name,items:c.items}));
+            navigator.clipboard.writeText(`${location.origin}${location.pathname}?cart=${d}`).then(()=>Toast.show('📋 Скопировано!')).catch(()=>Toast.show('📋 Скопировано!'));
+        },
+
+        toggleComparison(id){
+            const i=State.comparisonList.indexOf(id);
+            i!==-1?State.comparisonList.splice(i,1):State.comparisonList.length<3?State.comparisonList.push(id):Toast.show('⚠️ Макс 3');
+            this.updateComparisonBar();this.renderProducts();
+        },
+
+        addToComparison(){
+            const id=parseInt(document.getElementById('compareSelect').value);
+            if(!id||State.comparisonList.includes(id))return;
+            if(State.comparisonList.length>=3){Toast.show('⚠️ Макс 3');return;}
+            State.comparisonList.push(id);this.updateComparisonBar();this.renderComparisonPage();
+        },
+
+        clearComparison(){State.comparisonList=[];this.updateComparisonBar();},
+
+        updateComparisonBar(){
+            const b=document.getElementById('comparisonBar'),it=document.getElementById('comparisonBarItems');
+            if(!b||!it)return;
+            if(!State.comparisonList.length){b.classList.remove('active');return;}
+            b.classList.add('active');
+            it.innerHTML=State.comparisonList.map(id=>{
+                const p=State.products.find(x=>x.id===id);
+                return p?`<div class="comparison-item">${p.img} ${Utils.escapeHtml(p.name)} <button onclick="App.toggleComparison(${id})">×</button></div>`:'';
+            }).join('');
+        },
+
+        renderComparisonPage(){
+            const c=document.getElementById('comparisonTableContainer'),l=document.getElementById('compareProductsList');
+            if(!c)return;
+            const s=document.getElementById('compareSelect');
+            if(s)s.innerHTML='<option value="">-- Выберите --</option>'+State.products.filter(p=>!State.comparisonList.includes(p.id)).map(p=>`<option value="${p.id}">${p.img} ${Utils.escapeHtml(p.name)}</option>`).join('');
+            if(l)l.innerHTML=State.comparisonList.map(id=>{const p=State.products.find(x=>x.id===id);return p?`<span style="background:#f0f0f0;padding:6px 12px;border-radius:20px;">${p.img} ${Utils.escapeHtml(p.name)} <button style="background:none;border:none;cursor:pointer;color:var(--red);" onclick="App.toggleComparison(${id})">×</button></span>`:'';}).join('');
+            const prods=State.comparisonList.map(id=>State.products.find(p=>p.id===id)).filter(Boolean);
+            if(!prods.length){c.innerHTML='<p style="color:#999;text-align:center;">Выберите товары</p>';return;}
+            const mp=Math.min(...prods.map(p=>p.price));
+            const mxP=Math.max(...prods.map(p=>p.protein||0));
+            const mnC=Math.min(...prods.map(p=>p.calories||Infinity));
+            c.innerHTML=`<table class="comparison-table"><thead><tr><th>Характеристика</th>${prods.map(p=>`<th>${p.img} ${Utils.escapeHtml(p.name)}</th>`).join('')}</tr></thead><tbody>
+            <tr><td><strong>Цена</strong></td>${prods.map(p=>`<td class="${p.price===mp?'best-value':''}">${p.price.toFixed(2)} ₽${p.price===mp?' 🏆':''}</td>`).join('')}</tr>
+            <tr><td>Магазин</td>${prods.map(p=>`<td>${Utils.escapeHtml(p.shop)}</td>`).join('')}</tr>
+            <tr><td>Бренд</td>${prods.map(p=>`<td>${Utils.escapeHtml(p.brand)}</td>`).join('')}</tr>
+            <tr><td>Вес</td>${prods.map(p=>`<td>${p.weight}</td>`).join('')}</tr>
+            <tr><td><strong>Белки</strong></td>${prods.map(p=>`<td class="${(p.protein||0)===mxP?'best-value':''}">${p.protein||'—'}${(p.protein||0)===mxP?' 🏆':''}</td>`).join('')}</tr>
+            <tr><td>Жиры</td>${prods.map(p=>`<td>${p.fat||'—'}</td>`).join('')}</tr>
+            <tr><td>Углеводы</td>${prods.map(p=>`<td>${p.carbs||'—'}</td>`).join('')}</tr>
+            <tr><td><strong>Калории</strong></td>${prods.map(p=>`<td class="${(p.calories||Infinity)===mnC?'best-value':''}">${p.calories||'—'}${(p.calories||Infinity)===mnC?' 🏆':''}</td>`).join('')}</tr>
+        </tbody></table>`;
+        },
+
+        renderProducts(){
+            const c=document.getElementById('popularProducts');if(!c)return;
+            c.innerHTML=State.products.map(p=>{
+                const h=State.generatePriceHistory(p.id);
+                const d=h.length>1?h[h.length-1].price-h[h.length-2].price:0;
+                const inC=State.comparisonList.includes(p.id);
+                const mx=Math.max(...h.map(x=>x.price)),mn=Math.min(...h.map(x=>x.price)),r=mx-mn||1;
+                return `<div class="product-card" tabindex="0" onclick="App.viewProduct(${p.id})">
+                <div class="product-img">${p.img}</div>
+                <div class="product-info">
+                    <div style="display:flex;justify-content:space-between;">
+                        <div class="product-title">${Utils.escapeHtml(p.name)}</div>
+                        <button class="favorite-star ${State.favorites.includes(p.id)?'active':''}" onclick="event.stopPropagation();App.toggleFavorite(${p.id})">${State.favorites.includes(p.id)?'★':'☆'}</button>
+                    </div>
+                    <div class="product-price">${p.price.toFixed(2)} ₽</div>
+                    <span class="price-delta ${d<0?'down':'up'}">${d<0?'↓':'↑'} ${Math.abs(d).toFixed(2)} ₽ за неделю</span>
+                    <div class="chart-bar" style="margin-top:4px;">${h.slice(-14).map(x=>`<div class="chart-column" style="height:${((x.price-mn)/r)*60+15}px;" title="${x.date}: ${x.price.toFixed(2)} ₽"><span class="tooltip">${x.price.toFixed(2)} ₽</span></div>`).join('')}</div>
+                    <div class="product-meta">${Utils.escapeHtml(p.brand)} • ${p.weight} • 🏪 ${Utils.escapeHtml(p.shop)}</div>
+                    <div class="product-nutrition">${Utils.formatNutrition(Utils.getProductNutritionTotals(p))}</div>
+                    <div class="reactions">
+                        <button onclick="event.stopPropagation();App.likeProduct(${p.id})">👍 ${p.likes}</button>
+                        <button onclick="event.stopPropagation();App.dislikeProduct(${p.id})">👎 ${p.dislikes}</button>
+                        <button onclick="event.stopPropagation();App.addToCart(${p.id})" style="background:var(--yellow);">🛒 В корзину</button>
+                        <button onclick="event.stopPropagation();App.toggleComparison(${p.id})" style="background:${inC?'var(--blue)':'#f0f0f0'};color:${inC?'white':'var(--black)'};">⚖️ ${inC?'В сравнении':'Сравнить'}</button>
+                    </div>
+                </div>
+            </div>`;
+            }).join('');
+            this.updateComparisonBar();
+        },
+
+        viewProduct(id){
+            const p=State.products.find(x=>x.id===id);if(!p)return;
+            const h=State.generatePriceHistory(id);
+            const mx=Math.max(...h.map(x=>x.price)),mn=Math.min(...h.map(x=>x.price)),r=mx-mn||1;
+            const n=Utils.getProductNutritionTotals(p);
+            document.getElementById('productDetailContainer').innerHTML=`
+            <div style="background:white;border-radius:24px;padding:28px;">
+                <div style="font-size:80px;text-align:center;">${p.img}</div>
+                <h1>${Utils.escapeHtml(p.name)}</h1>
+                <div class="chart-bar" style="height:100px;margin:12px 0;">${h.map(x=>`<div class="chart-column" style="height:${((x.price-mn)/r)*80+10}px;" title="${x.date}: ${x.price.toFixed(2)} ₽"><span class="tooltip">${x.date}<br>${x.price.toFixed(2)} ₽</span></div>`).join('')}</div>
+                <div style="margin:20px 0;display:grid;gap:12px;">
+                    <p><strong>🏷️ Бренд:</strong> ${Utils.escapeHtml(p.brand)}</p>
+                    <p><strong>⚖️ Вес:</strong> ${p.weight}</p>
+                    <p><strong>🥩 Белки:</strong> ${n.protein.toFixed(1)} г (${p.protein||'—'} г/100г)</p>
+                    <p><strong>🧈 Жиры:</strong> ${n.fat.toFixed(1)} г (${p.fat||'—'} г/100г)</p>
+                    <p><strong>🍚 Углеводы:</strong> ${n.carbs.toFixed(1)} г (${p.carbs||'—'} г/100г)</p>
+                    <p><strong>🔥 Калории:</strong> ${Math.round(n.calories)} ккал (${p.calories||'—'} ккал/100г)</p>
+                    <p><strong>🏪 Магазин:</strong> ${Utils.escapeHtml(p.shop)}</p>
+                    <p><strong>💰 Цена:</strong> <span style="color:var(--red);font-size:32px;font-weight:800;">${p.price.toFixed(2)} ₽</span></p>
+                </div>
+                <div style="display:flex;gap:12px;">
+                    <button class="btn btn-yellow" onclick="App.addToCart(${p.id});App.showPage('home');">🛒 В корзину</button>
+                    <button class="btn btn-outline" onclick="App.toggleComparison(${p.id})">⚖️ Сравнить</button>
+                    <button class="btn btn-outline" onclick="App.showPage('home')">← Назад</button>
+                </div>
+            </div>`;
+            this.showPage('product');
+        },
+
+        likeProduct(id){const p=State.products.find(x=>x.id===id);if(p){p.likes++;this.renderProducts();State.saveProducts();}},
+        dislikeProduct(id){const p=State.products.find(x=>x.id===id);if(p){p.dislikes++;this.renderProducts();State.saveProducts();}},
+        toggleFavorite(id){const i=State.favorites.indexOf(id);i===-1?State.favorites.push(id):State.favorites.splice(i,1);State.saveFavorites();this.renderProducts();},
+
+        searchProducts(){
+            const q=document.getElementById('globalSearch').value.toLowerCase();
+            const c=document.getElementById('popularProducts');if(!c)return;
+            const f=q?State.products.filter(p=>p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)||p.shop.toLowerCase().includes(q)):State.products;
+            c.innerHTML=f.length?f.map(p=>`<div class="product-card" onclick="App.viewProduct(${p.id})"><div class="product-img">${p.img}</div><div class="product-info"><div class="product-title">${Utils.escapeHtml(p.name)}</div><div class="product-price">${p.price.toFixed(2)} ₽</div><div class="product-nutrition">${Utils.formatNutrition(Utils.getProductNutritionTotals(p))}</div><button onclick="event.stopPropagation();App.addToCart(${p.id})" class="btn btn-yellow btn-small">🛒 В корзину</button></div></div>`).join(''):'<p style="text-align:center;">Ничего не найдено</p>';
+        },
+
+        handleCreateProduct(e){
+            e.preventDefault();
+            const name=document.getElementById('productName').value,price=document.getElementById('productPrice').value;
+            if(!name||!price){alert('❌ Заполните название и цену');return;}
+            const id=Math.max(...State.products.map(p=>p.id),0)+1;
+            State.products.push({id,name,brand:document.getElementById('productBrand').value||"Не указан",price:parseFloat(price),weight:document.getElementById('productWeight').value||"Не указано",shop:document.getElementById('shopSelect').value,likes:0,dislikes:0,img:"🆕",date:new Date().toISOString().slice(0,10),protein:document.getElementById('protein').value?parseFloat(document.getElementById('protein').value):null,fat:document.getElementById('fat').value?parseFloat(document.getElementById('fat').value):null,carbs:document.getElementById('carbs').value?parseFloat(document.getElementById('carbs').value):null,calories:document.getElementById('calories').value?parseFloat(document.getElementById('calories').value):null});
+            State.saveProducts();this.renderProducts();Toast.show(`✅ "${name}" создан!`);this.showPage('home');e.target.reset();
+        },
+
+        updateCartUI(){
+            document.getElementById('cartCount').textContent=State.getCartCount();
+            this.renderCartDropdown();
+            this.updateCartSummaryPreview();
+            this.renderNutritionStats();
+            this.updateCartNutritionSummary();
+            this.updateBudgetPreview();
+            this.updateBestPricePreview();
+            this.refreshShops();
+            if(document.getElementById('page-cart').classList.contains('active'))this.renderCartPage();
+        },
+
+        updateCartNutritionSummary(){
+            const g=document.getElementById('cartNutritionGrid');if(!g)return;
+            const n=State.getCartNutrition(),items=State.getCartItems();
+            g.innerHTML=items.length?`
+            <div class="cart-nutrition-item"><div class="label">🥩 Белки</div><div class="value">${n.protein.toFixed(1)} г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🧈 Жиры</div><div class="value">${n.fat.toFixed(1)} г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🍚 Углеводы</div><div class="value">${n.carbs.toFixed(1)} г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🔥 Калории</div><div class="value">${n.calories} ккал</div></div>`:
+                `<div class="cart-nutrition-item"><div class="label">🥩 Белки</div><div class="value">0 г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🧈 Жиры</div><div class="value">0 г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🍚 Углеводы</div><div class="value">0 г</div></div>
+            <div class="cart-nutrition-item"><div class="label">🔥 Калории</div><div class="value">0 ккал</div></div>`;
+        },
+
+        renderCartDropdown(){
+            document.getElementById('currentCartName').textContent=State.getCurrentCart()?.name||'Корзина';
+            document.getElementById('cartPageTitle').textContent=State.getCurrentCart()?.name||'Корзина';
+            const c=document.getElementById('cartDropdown');if(!c)return;
+            c.innerHTML=State.carts.map(cart=>`<div class="cart-dropdown-item ${cart.id===State.currentCartId?'active':''}" onclick="App.switchCart('${cart.id}')"><span>${Utils.escapeHtml(cart.name)} ${cart.isFavorite?'⭐':''}</span><span style="display:flex;gap:4px;"><span style="font-size:11px;color:#666;">${cart.items.reduce((s,i)=>s+i.quantity,0)} шт</span><button class="rename-cart-btn" onclick="event.stopPropagation();App.openRenameModalForId('${cart.id}')">✏️</button><button class="delete-cart" onclick="event.stopPropagation();App.deleteCart('${cart.id}')">🗑️</button></span></div>`).join('')+'<div class="create-cart-btn" onclick="App.openCreateCartModal()">+ Создать новую корзину</div>';
+        },
+
+        openRenameModalForId(id){
+            const c=State.carts.find(x=>x.id===id);if(!c)return;
+            document.getElementById('modalTitle').textContent='Переименовать';
+            document.getElementById('cartNameInput').value=c.name;
+            document.getElementById('modalConfirmBtn').textContent='Сохранить';
+            const savedCartId = State.currentCartId;
+            State.currentCartId = id;
+            document.getElementById('modalConfirmBtn').onclick = () => {
+                this.renameCart(id, document.getElementById('cartNameInput').value);
+                this.closeModal('cartModal');
+                State.currentCartId = savedCartId;
+                document.getElementById('modalConfirmBtn').onclick = () => this.handleCartModalConfirm();
+            };
+            this.openModal('cartModal');
+        },
+
+        openCreateCartModal(){
+            document.getElementById('modalTitle').textContent='Создать корзину';
+            document.getElementById('cartNameInput').value='';
+            document.getElementById('modalConfirmBtn').textContent='Создать';
+            document.getElementById('modalConfirmBtn').onclick = () => this.handleCartModalConfirm();
+            this.openModal('cartModal');
+        },
+
+        handleCartModalConfirm() {
+            const n = document.getElementById('cartNameInput').value;
+            const title = document.getElementById('modalTitle').textContent;
+            if (title.includes('Создать')) {
+                this.createCart(n);
+            } else {
+                this.renameCart(State.currentCartId, n);
+            }
+            this.closeModal('cartModal');
+            document.getElementById('modalConfirmBtn').onclick = () => this.handleCartModalConfirm();
+        },
+
+        updateCartSummaryPreview(){
+            const items=State.getCartItems(),c=document.getElementById('cartSummaryPreview'),t=document.getElementById('cartTotalPreview'),n=document.getElementById('cartNutritionPreview');
+            if(!c)return;
+            if(!items.length){c.innerHTML='<p style="color:#999;">Пусто</p>';if(t)t.innerHTML='';if(n)n.innerHTML='';return;}
+            c.innerHTML=items.slice(0,3).map(i=>`<div style="padding:4px 0;font-size:13px;">${i.product.img} ${Utils.escapeHtml(i.product.name)} x${i.quantity}</div>`).join('')+(items.length>3?`<div style="font-size:12px;color:#999;">+ ещё ${items.length-3}</div>`:'');
+            if(t)t.innerHTML=`<strong>${State.getCartTotal().toFixed(2)} ₽</strong>`;
+            if(n){const nu=State.getCartNutrition();n.innerHTML=`<div style="font-size:11px;color:var(--green);margin-top:4px;">${Utils.formatNutrition(nu)}</div>`;}
+        },
+
+        renderCartPage(){
+            const c=document.getElementById('cartItemsList');if(!c)return;
+            const items=State.getCartItems();
+            if(!items.length){c.innerHTML='<div style="text-align:center;padding:48px;"><h3>Корзина пуста</h3><button class="btn btn-yellow" onclick="App.showPage(\'home\')">К товарам</button></div>';this.renderNutritionStats();this.updateCartNutritionSummary();return;}
+            c.innerHTML=items.map(item=>{
+                const n=Utils.getProductNutritionTotals(item.product);
+                const tn={protein:n.protein*item.quantity,fat:n.fat*item.quantity,carbs:n.carbs*item.quantity,calories:n.calories*item.quantity};
+                return `<div class="cart-item">
+                <div class="cart-item-main">
+                    <div style="font-size:36px;">${item.product.img}</div>
+                    <div class="cart-item-details">
+                        <div class="cart-item-name">${Utils.escapeHtml(item.product.name)}</div>
+                        <div class="cart-item-meta">${item.product.brand} • ${item.product.weight} • 🏪 ${Utils.escapeHtml(item.product.shop)}</div>
+                        <div class="cart-item-nutrition">${Utils.formatNutrition(tn)||'<span style="color:#999;">Нет данных КБЖУ</span>'}</div>
+                        ${item.quantity>1?`<div style="font-size:10px;color:#999;">На 1 шт: ${Utils.formatNutrition(n)}</div>`:''}
+                    </div>
+                </div>
+                <div class="cart-item-price-section">
+                    <div class="cart-item-price">${(item.product.price*item.quantity).toFixed(2)} ₽</div>
+                    <div class="cart-item-unit-price">${item.product.price.toFixed(2)} ₽/шт</div>
+                </div>
+                <div class="quantity-control">
+                    <button class="quantity-btn" onclick="App.removeFromCart(${item.product.id})">−</button>
+                    <span style="font-weight:600;">${item.quantity}</span>
+                    <button class="quantity-btn" onclick="App.addToCart(${item.product.id})">+</button>
+                </div>
+            </div>`;
+            }).join('')+'<div class="cart-total"><span>ИТОГО:</span><span style="color:var(--red);">'+State.getCartTotal().toFixed(2)+' ₽</span></div>';
+            this.renderNutritionStats();this.updateCartNutritionSummary();
+        },
+
+        renderNutritionStats(){
+            const c=document.getElementById('nutritionStats'),t=document.getElementById('cartTotalDisplay');
+            if(!c)return;
+            const n=State.getCartNutrition();
+            if(t)t.textContent=State.getCartTotal().toFixed(2)+' ₽';
+            c.innerHTML=`<div class="nutrition-item"><div class="label">🥩 Белки</div><div class="value">${n.protein.toFixed(1)} г</div></div>
+            <div class="nutrition-item"><div class="label">🧈 Жиры</div><div class="value">${n.fat.toFixed(1)} г</div></div>
+            <div class="nutrition-item"><div class="label">🍚 Углеводы</div><div class="value">${n.carbs.toFixed(1)} г</div></div>
+            <div class="nutrition-item"><div class="label">🔥 Калории</div><div class="value">${n.calories} ккал</div></div>`;
+        },
+
+        updateBudgetPreview(){
+            const items=State.getCartItems(),c=document.getElementById('budgetCartPreview'),t=document.getElementById('budgetTotalPreview');
+            if(!c)return;
+            c.innerHTML=items.length?items.map(i=>`<div style="padding:8px 0;border-bottom:1px solid #eee;">${i.product.img} ${Utils.escapeHtml(i.product.name)} x${i.quantity} — ${(i.product.price*i.quantity).toFixed(2)} ₽<div style="font-size:10px;color:var(--green);">${Utils.formatNutrition(Utils.getProductNutritionTotals(i.product))}</div></div>`).join(''):'<p style="color:#999;">Пусто</p>';
+            if(t)t.innerHTML=items.length?`<strong>${State.getCartTotal().toFixed(2)} ₽</strong>`:'';
+        },
+
+        updateBestPricePreview(){
+            const items=State.getCartItems(),c=document.getElementById('bestPriceCartPreview');
+            if(c)c.innerHTML=items.length?items.map(i=>`<div style="padding:6px 0;">• ${Utils.escapeHtml(i.product.name)} (x${i.quantity}) — ${(i.product.price*i.quantity).toFixed(2)} ₽ <span style="font-size:10px;color:var(--green);">${Utils.formatNutrition(Utils.getProductNutritionTotals(i.product))}</span></div>`).join(''):'<p style="color:#999;">Пусто</p>';
+        },
+
+        findNearbyShops(lat,lng){
+            State.shopMarkers.forEach(m=>m.remove());State.shopMarkers=[];
+            const shops=State.shopsGeoData.map(s=>({...s,distance:Utils.calculateDistance(lat,lng,s.lat,s.lng),totalPrice:State.getCartItems().reduce((sum,i)=>sum+i.product.price*i.quantity*s.priceFactor,0)})).sort((a,b)=>a.distance-b.distance).filter(s=>s.distance<=5);
+            if(!shops.length){document.getElementById('shopsListContainer').innerHTML='<p style="color:gray;text-align:center;">🔍 Нет магазинов в 5 км</p>';return;}
+            const bp=Math.min(...shops.map(s=>s.totalPrice));
+            shops.forEach(s=>{
+                const isB=s.totalPrice===bp&&s.totalPrice>0;
+                const m=L.marker([s.lat,s.lng],{icon:L.divIcon({html:isB?'🏪⭐':'🏪',iconSize:[28,28],className:'shop-marker',popupAnchor:[0,-14]})}).addTo(State.map);
+                m.bindPopup(`<div><strong>${s.name}</strong><br>📍 ${s.address}<br>📏 ${s.distance.toFixed(2)} км<br>${s.totalPrice>0?`💰 ${s.totalPrice.toFixed(2)} ₽`:'💰 Нет товаров'}${isB?'<br>🏆 Лучшая цена!':''}</div>`);
+                State.shopMarkers.push(m);
+            });
+            document.getElementById('shopsListContainer').innerHTML=shops.map(s=>`<div class="shop-list-item ${s.totalPrice===bp&&s.totalPrice>0?'best-price':''}" onclick="MapModule.centerOnShop(${s.lat},${s.lng},'${s.name}')"><strong>${s.name} ${s.totalPrice===bp&&s.totalPrice>0?'⭐':''}</strong><br>📍 ${s.address}<br>📏 ${s.distance.toFixed(2)} км<br>💰 ${s.totalPrice>0?s.totalPrice.toFixed(2)+' ₽':'Нет товаров'}</div>`).join('');
+        },
+
+        refreshShops(){State.userLocation?this.findNearbyShops(State.userLocation.lat,State.userLocation.lng):MapModule.requestGeolocation();},
+
+        searchBestPrice(){
+            const items=State.getCartItems(),c=document.getElementById('bestPriceShops');
+            if(!items.length){c.innerHTML='<p style="color:gray;">⚠️ Пусто</p>';return;}
+            c.innerHTML=State.shopsGeoData.map(s=>({...s,totalPrice:items.reduce((sum,i)=>sum+i.product.price*i.quantity*s.priceFactor,0)})).sort((a,b)=>a.totalPrice-b.totalPrice).map(s=>`<div class="shop-list-item">🏪 ${s.name}<br>💰 ${s.totalPrice.toFixed(2)} ₽<br>📍 ${s.address}</div>`).join('');
+            Toast.show('🏆 Найдены лучшие цены');
+        },
+
+        simulateBudgetSearch(){
+            const c=document.getElementById('countrySelect')?.value||'Москва, Россия';
+            const R={'Москва, Россия':1,'Минск, Беларусь':0.44,'Алматы, Казахстан':0.21,'Стамбул, Турция':0.046,'Берлин, Германия':0.0095};
+            const S={'Москва, Россия':'₽','Минск, Беларусь':'Br','Алматы, Казахстан':'₸','Стамбул, Турция':'₺','Берлин, Германия':'€'};
+            document.getElementById('budgetMap').innerHTML=`🗺️ <strong>${c}</strong><br><small>💰 ${(State.getCartTotal()*(R[c]||1)).toFixed(2)} ${S[c]||'?'}</small>`;
+            Toast.show(`🔍 Поиск в ${c}`);
+        },
+
+        applyNutritionProfile(name) {
+            const p=State.nutritionProfiles[name]; if(!p)return;
+            document.getElementById('kbzhuProteinInput').value=p.protein;
+            document.getElementById('kbzhuFatInput').value=p.fat;
+            document.getElementById('kbzhuCarbsInput').value=p.carbs;
+            document.getElementById('kbzhuCaloriesInput').value=p.calories;
+            document.querySelectorAll('#kbzhuProfiles .profile-tag').forEach(t=>t.classList.remove('active'));
+            document.querySelector(`#kbzhuProfiles .profile-tag[onclick*="${name}"]`)?.classList.add('active');
+        },
+
+        openRenameModal() {
+            const c=State.getCurrentCart(); if(!c)return;
+            document.getElementById('modalTitle').textContent='Переименовать';
+            document.getElementById('cartNameInput').value=c.name;
+            document.getElementById('modalConfirmBtn').textContent='Сохранить';
+            document.getElementById('modalConfirmBtn').onclick = () => this.handleCartModalConfirm();
+            this.openModal('cartModal');
+        },
+
+        toggleCartDropdown() {
+            document.getElementById('cartSelector')?.classList.toggle('active');
+            document.getElementById('autobuildWrapper')?.classList.remove('active');
+        },
+
+        toggleAutoBuildDropdown() {
+            document.getElementById('autobuildWrapper')?.classList.toggle('active');
+            document.getElementById('cartSelector')?.classList.remove('active');
+        }
+    };
+
+    // Запуск приложения
+    document.addEventListener('DOMContentLoaded', () => {
+        App.init();
+        console.log('🚀 Fairview v2.4 — исправленная автосборка с multi-shop режимом');
     });
-
-    function checkDuplicate() {
-        // симуляция проверки дубликатов
-        const name = document.getElementById('productName')?.value;
-        const shop = document.getElementById('shopSelect')?.value;
-        const exists = products.some(p => p.name.toLowerCase() === name?.toLowerCase() && p.shop === shop);
-        const warning = document.getElementById('duplicateWarning');
-        if(warning) warning.style.display = exists ? 'block' : 'none';
-    }
-    document.getElementById('productName')?.addEventListener('input', checkDuplicate);
-    document.getElementById('shopSelect')?.addEventListener('change', checkDuplicate);
-
-    renderProducts();
 </script>
 </body>
 </html>
